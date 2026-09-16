@@ -56,6 +56,13 @@ jobs:
       - name: Estilo
         run: pnpm lint
 
+      # `LayoutProps` y las demas definiciones de rutas las genera Next en
+      # .next/types. En una maquina de desarrollo ya estan de un build anterior,
+      # asi que `tsc` pasa; en un clon recien hecho no existen y `tsc` falla con
+      # TS2304. `next typegen` las genera sin compilar del todo.
+      - name: Tipos de las rutas
+        run: pnpm exec next typegen
+
       - name: Tipos
         run: pnpm exec tsc --noEmit
 
@@ -104,6 +111,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
           SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
           EOF
+
+      - name: Tipos de las rutas
+        run: pnpm exec next typegen
 
       - name: Pruebas de RLS contra la base de datos
         run: pnpm vitest run
