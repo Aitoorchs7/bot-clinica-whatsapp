@@ -45,3 +45,7 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Supabase CLI (estado local del enlace, nunca al repositorio)
+supabase/.temp/
+supabase/.branches/

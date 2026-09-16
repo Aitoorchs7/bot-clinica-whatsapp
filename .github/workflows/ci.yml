@@ -1,0 +1,113 @@
+# =============================================================================
+# CI
+# =============================================================================
+# Existe porque cuatro comentarios del repositorio afirmaban que la mitad
+# estatica de los tests de RLS "bloquea el merge en CI" cuando no habia ningun
+# CI. O se monta, o se borra la frase; se monta.
+#
+# Dos trabajos, y la diferencia importa:
+#
+#   comprobaciones-estaticas · Corre siempre, sin credenciales. Lee los .sql de
+#     supabase/migrations y comprueba que ninguna tabla se ha quedado sin RLS y
+#     sin politicas. Demuestra que las politicas estan ESCRITAS.
+#
+#   rls-viva · Se conecta al proyecto de desarrollo como cada rol y comprueba,
+#     tabla por tabla, que ve y que no. Demuestra que la base de datos las tiene
+#     PUESTAS, que no es lo mismo.
+#
+# El nombre del primero dice lo que cubre a proposito: un tick verde que ponga
+# "comprobaciones estaticas" no se confunde con una suite completa.
+#
+# PARA QUE ESTO BLOQUEE DE VERDAD hace falta un paso mas, y es en la web de
+# GitHub, no aqui: Settings > Branches > Add branch ruleset sobre `main`, con
+# "Require status checks to pass" y el check `comprobaciones-estaticas`
+# marcado. Sin eso este archivo informa, pero no impide nada.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la ejecucion anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comprobaciones-estaticas:
+    name: comprobaciones-estaticas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Estilo
+        run: pnpm lint
+
+      - name: Tipos
+        run: pnpm exec tsc --noEmit
+
+      # Aqui dentro van los tests de RLS que no necesitan base de datos: que
+      # toda tabla tenga `enable row level security`, que ninguna politica sea
+      # `for all`, que todo UPDATE lleve su WITH CHECK y su SELECT, que
+      # `escalados` no tenga ni una columna de texto libre, y que service_role
+      # no aparezca en el camino del bot. La mitad viva se salta sola y avisa.
+      - name: Pruebas
+        run: pnpm vitest run
+
+      - name: Compilacion
+        run: pnpm build
+
+  rls-viva:
+    name: rls-viva
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Se activa poniendo la variable de repositorio RLS_VIVA a "true" y los
+    # cuatro secretos de abajo. Sin eso no corre: mas vale un trabajo ausente
+    # que uno verde por no haber comprobado nada.
+    if: vars.RLS_VIVA == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # El proyecto tiene que ser el de DESARROLLO. La siembra crea cuatro
+      # usuarios con una contrasena que esta escrita en el repositorio y, al
+      # limpiar, borra clinicas en cascada. `exigirBaseDeDesarrollo` se niega a
+      # sembrar si encuentra pacientes o citas que no sean de las clinicas de
+      # prueba, pero el primer cerrojo es no poner aqui el secreto de produccion.
+      - name: Preparar el entorno
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL_DEV }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY_DEV }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
+          EOF
+
+      - name: Pruebas de RLS contra la base de datos
+        run: pnpm vitest run
+
+      - name: Borrar el entorno
+        if: always()
+        run: rm -f .env.local
