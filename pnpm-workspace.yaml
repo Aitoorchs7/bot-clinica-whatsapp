@@ -1,0 +1,7 @@
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
+  # Los paquetes publicados ya vienen compilados: no hace falta ejecutar sus
+  # scripts de instalación.
+  "@google/genai": false
+  protobufjs: false

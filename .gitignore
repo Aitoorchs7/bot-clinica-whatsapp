@@ -1,0 +1,47 @@
+# Variables de entorno — NUNCA se suben. La única excepción es .env.example,
+# que va sin valores.
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+.env.staging
+!.env.example
+
+# Dependencias
+node_modules/
+/.pnp
+.pnp.*
+
+# Next.js
+.next/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# Pruebas
+coverage/
+playwright-report/
+/test-results/
+/blob-report/
+/playwright/.cache/
+
+# Registros
+*.log
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+*.pem
+*.swp
+*.swo
+.idea/
+.vscode/settings.json
+.vscode/launch.json
+
+# Vercel
+.vercel
