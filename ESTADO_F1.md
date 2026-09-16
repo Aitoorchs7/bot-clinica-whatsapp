@@ -120,6 +120,13 @@ en verde con la RLS apagada — pasaría por el motivo equivocado.
 Settings → Branches → ruleset sobre `main` → «Require status checks to pass» →
 marcar `comprobaciones-estaticas`.
 
+> **La primera ejecución ya sirvió para algo.** Falló con
+> `TS2304: Cannot find name 'LayoutProps'`. Ese tipo lo genera Next en
+> `.next/types`, que en una máquina de desarrollo ya existe de un build
+> anterior: `tsc` pasaba en local y fallaba en un clon recién hecho.
+> Reproducido borrando `.next`. Arreglado con un paso `next typegen` antes de
+> `tsc`. Es justo la clase de fallo que ningún test estático puede encontrar.
+
 ---
 
 ## 2 · Primera ronda: revisión propia
@@ -401,6 +408,14 @@ pnpm exec tsc --noEmit → (sin salida)
 pnpm vitest run        → Test Files  3 passed | 5 skipped (8)
                           Tests  93 passed | 169 skipped (262)
 pnpm build             → ✓ Compiled successfully in 914ms
+```
+
+Y en CI, sobre un clon limpio (run 35139838028):
+
+```
+✓ comprobaciones-estaticas in 56s
+  ✓ Estilo · ✓ Tipos de las rutas · ✓ Tipos · ✓ Pruebas · ✓ Compilacion
+- rls-viva in 0s          (saltado: falta la variable RLS_VIVA)
 ```
 
 ---
