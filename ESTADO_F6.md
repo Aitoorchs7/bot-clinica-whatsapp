@@ -166,7 +166,7 @@ Sigue habiendo **cero funciones `SECURITY DEFINER`** en todo el proyecto.
 | `src/lib/trabajos/recordatorios.ts` | Recorre las clínicas, reclama, manda, guarda |
 | `src/lib/trabajos/retencion.ts` | Cuenta lo que la purga debería haberse llevado |
 | `src/lib/whatsapp/confirmar.ts` | Atiende `CONFIRMAR:` y `CANCELAR:` contra la base |
-| `src/app/api/cron/recordatorios/route.ts` y `.../retencion/route.ts` | Las dos rutas nuevas |
+| `src/app/api/cron/recordatorios/route.ts` y `.../retencion/route.ts` | Las dos rutas nuevas. La de retención alerta con el **código de estado**, no solo en el cuerpo: §5.4b |
 | `vercel.json` | Los tres horarios. No existía |
 
 ### El orden que ejecuta `mandarRecordatorios()`
@@ -340,8 +340,8 @@ El criterio de F1–F5, sin rebajarlo. Salida real, pegada tal cual:
 ```
 ===== VITEST · TIRADA 1 =====        ===== VITEST · TIRADA 2 =====
  Test Files  39 passed | 1 skipped    Test Files  39 passed | 1 skipped (40)
-      Tests  825 passed | 5 skipped        Tests  825 passed | 5 skipped (830)
-   Duration  129.61s                    Duration  127.14s
+      Tests  829 passed | 5 skipped        Tests  829 passed | 5 skipped (834)
+   Duration  130.79s                    Duration  128.42s
 
 ===== PLAYWRIGHT · TIRADA 1 =====    ===== PLAYWRIGHT · TIRADA 2 =====
   31 passed (1.0m)                     31 passed (49.8s)
@@ -359,7 +359,7 @@ corre sin `GEMINI_VIVO=1`. Es lo que decidió ESTADO_F3 §1.
 
 | | Antes de F6 | F6 | Total |
 |---|---|---|---|
-| Vitest | 751 | **+74** | 825 |
+| Vitest | 751 | **+78** | 829 |
 | Playwright | 31 | — | 31 |
 
 | Archivo | Pruebas | Necesita |
@@ -371,10 +371,10 @@ corre sin `GEMINI_VIVO=1`. Es lo que decidió ESTADO_F3 §1.
 | `tests/trabajos-vivo/02-provisionales.test.ts` | 4 | Supabase + CLI |
 | `tests/trabajos-vivo/03-purga.test.ts` | 6 | Supabase + CLI |
 | `tests/trabajos-vivo/04-boton.test.ts` | 10 | Supabase |
-| `tests/trabajos-vivo/05-retencion.test.ts` | 4 | Supabase |
+| `tests/trabajos-vivo/05-retencion.test.ts` | 8 | Supabase |
 | `tests/rls/00-rls-activada.test.ts` | +2 | nada |
 
-**34 de las 74 corren en una máquina recién clonada**, así que el trabajo
+**34 de las 78 corren en una máquina recién clonada**, así que el trabajo
 `comprobaciones-estaticas` de CI las cubre sin credenciales de nada.
 
 **`pnpm test` no hace ni una petición a Meta, ni a Gemini, ni a Deepgram.**
@@ -518,6 +518,43 @@ correcto y es el punto: esa la para la RLS, no esta comprobación. Cada defensa
 tiene su prueba y ninguna tapa el hueco de la otra — si un día se mezclaran,
 quitar una de las dos dejaría las dos pruebas en verde.
 
+### 5.4b · La ruta de retención contestaba 200 con la base sucia
+
+**Salió de una pregunta del usuario al cerrar**, no de la batería: «confirma
+que tiene un test que demuestre que SÍ alerta cuando la purga no se ha
+ejecutado, no solo que responde 200 cuando todo va bien». No lo tenía, y al ir
+a escribirlo aparecieron **dos** defectos encadenados.
+
+**El primero: la alarma no salía por donde se mira.** La ruta devolvía 200
+siempre que hubiera podido comprobar, estuviera limpia o sucia; `alDia: false`
+se quedaba en el cuerpo, en `console.error` y en `eventos`. Quien vigila un
+cron mira el código de estado, así que la purga podía llevar semanas parada con
+el panel de Vercel entero en verde. Ahora son tres respuestas —200 limpio, 500
+sucio, 503 no he podido mirar—, con la misma taxonomía que `/api/cron/salud`.
+
+**El segundo lo cazó la prueba de que las tres son distintas**, y es peor:
+
+```
+AssertionError: expected [ 200, 500, 200 ] to deeply equal [ 200, 500, 503 ]
+```
+
+Una clínica que estuviera en `WHATSAPP_CLINICAS` y **no en la base** salía con
+los cuatro recuentos a **cero** y se informaba como «al día». La RLS no
+devuelve filas para una clínica que no existe, y cero filas es indistinguible
+de «no hay nada que purgar». O sea: la pantalla diría que su retención va
+perfecta justo cuando no se está comprobando nada.
+
+Es el falso verde de ESTADO_F1 §5.2 por tercera vez en este proyecto —una
+aserción cuya única prueba es una lista vacía pasa igual si la fila no
+existe— y aquí llevaba puesto el disfraz de una buena noticia. El arreglo es
+el cerrojo que ya usaban el canal y los recordatorios: `exigirClinicaDelCanal()`
+antes de contar nada.
+
+**La lección, que es la de §5.3 otra vez por otro lado:** «no he podido
+comprobarlo» no es «está todo bien», igual que un 404 de Google no es un fallo
+de red. Las dos veces que este proyecto ha juntado esas dos cosas, lo que se
+ha perdido es la alarma.
+
 ### 5.5 · Dos pruebas destructivas propias, y las dos del mismo tipo
 
 **Las escribí yo, y rompieron once pruebas de otros archivos.**
@@ -631,6 +668,8 @@ movió: 16 antes, 16 después.
 | «Cancelar» promete una cancelación que no ocurre | Se comprueba que la cita sigue igual Y que el texto dice que sigue en pie |
 | El recordatorio lleva el motivo de la visita | Se busca «revisión», «urgencia», «ortodoncia»… en lo que sale por el cable |
 | El apunte de retención copia lo que escribió el paciente | Se siembra un marcador y se exige que no salga |
+| La ruta de retención contesta 200 con la base sucia | §5.4b · Se exige 500, y que 200/500/503 sean **tres** respuestas distintas |
+| Una clínica que no existe se informa como «al día» | §5.4b · `exigirClinicaDelCanal()` antes de contar: cero filas no es un buen resultado si no se ha podido mirar |
 | La purga «borra» con un `delete` sin `where` | Su pareja: lo sembrado hoy tiene que SOBREVIVIR |
 | La purga se comprueba leyendo el `.sql` | Se ejecuta de verdad, como `postgres`, y se cuentan filas antes y después |
 | El job existe pero ya no está programado | Se lee `cron.job` y se exigen los dos, con su horario |

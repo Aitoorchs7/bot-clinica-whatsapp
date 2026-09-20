@@ -16,7 +16,7 @@
  * Lo que se comprueba aquí es que ese silencio se acaba: que el número sale, y
  * que sale DONDE LA CLINICA LO VE y no solo en un registro que nadie lee.
  */
-import { afterEach, beforeAll, afterAll, expect, it } from 'vitest'
+import { afterEach, beforeAll, afterAll, expect, it, vi } from 'vitest'
 
 import { clienteBot, clienteServicio } from '../ayuda/clientes'
 import { describeVivo, sembrado } from '../ayuda/vivo'
@@ -155,6 +155,121 @@ describeVivo('la retencion se comprueba y se deja escrita', () => {
 
     expect(deB).toHaveLength(1)
     expect((deB![0]!.datos as { sobrante: { mensajes: number } }).sobrante.mensajes).toBe(0)
+  })
+
+  // ---------------------------------------------------------------------------
+  // LA RUTA, no solo la funcion
+  // ---------------------------------------------------------------------------
+  //
+  // Todo lo de arriba comprueba `comprobarLaRetencion()`. Quien vigila esto en
+  // produccion no llama a una funcion: llama a una URL y mira el codigo de
+  // estado. Si la ruta contestara 200 con la base sucia, la purga podria llevar
+  // semanas parada con el panel de Vercel entero en verde.
+
+  /** Planta un mensaje mas viejo que el plazo de retencion. */
+  async function mensajeSinPurgar(): Promise<void> {
+    const { data, error } = await clienteServicio()
+      .from('mensajes')
+      .insert({
+        clinica_id: s.clinicaA,
+        conversacion_id: s.conversacionA,
+        rol: 'paciente',
+        texto: 'esto tenia que haberse borrado',
+        creado_en: new Date(Date.now() - 200 * DIA).toISOString(),
+      } as never)
+      .select('id')
+      .single()
+    if (error) throw new Error(`Sembrando el mensaje viejo: ${error.message}`)
+    plantados.push(Number((data as { id: number }).id))
+  }
+
+  function pedir(cabeceras: Record<string, string>) {
+    return import('@/app/api/cron/retencion/route').then(({ GET }) =>
+      GET(new Request('https://ejemplo.test/api/cron/retencion', { headers: cabeceras })),
+    )
+  }
+
+  const AUTORIZADO = { authorization: 'Bearer secreto-de-retencion' }
+
+  it('LA RUTA ALERTA: con la purga sin ejecutar NO contesta 200', async () => {
+    // La prueba que pidió el encargo por su nombre. La primera versión de esta
+    // ruta devolvía 200 aquí y dejaba la alarma solo en el cuerpo y en el
+    // registro; con eso, un job de pg_cron parado no se distingue de uno sano.
+    vi.stubEnv('CRON_SECRET', 'secreto-de-retencion')
+    await mensajeSinPurgar()
+
+    const respuesta = await pedir(AUTORIZADO)
+    const cuerpo = (await respuesta.json()) as { alDia: boolean }
+
+    expect(
+      respuesta.status,
+      'La ruta ha contestado 200 con mensajes sin purgar. Quien vigila un cron ' +
+        'mira el código de estado: así la purga puede llevar semanas parada y ' +
+        'el panel de Vercel seguir verde.',
+    ).toBe(500)
+
+    expect(cuerpo.alDia).toBe(false)
+    vi.unstubAllEnvs()
+  })
+
+  it('LA PAREJA: con todo limpio SÍ contesta 200', async () => {
+    // Sin esta, la de arriba pasaría con una ruta que devolviera 500 siempre —y
+    // entonces la alarma sonaría todas las noches y se dejaría de mirar, que es
+    // la peor cosa que le puede pasar a una alarma.
+    vi.stubEnv('CRON_SECRET', 'secreto-de-retencion')
+
+    const respuesta = await pedir(AUTORIZADO)
+    const cuerpo = (await respuesta.json()) as { alDia: boolean }
+
+    expect(respuesta.status).toBe(200)
+    expect(cuerpo.alDia).toBe(true)
+    vi.unstubAllEnvs()
+  })
+
+  it('LAS TRES RESPUESTAS SON DISTINTAS: limpio, sucio y «no he podido mirar»', async () => {
+    // «Está sucio» y «no he podido comprobarlo» significan cosas opuestas: lo
+    // primero exige que alguien toque pg_cron, lo segundo se arregla solo. Un
+    // `try { … } catch { mal }` las juntaría, y es justo lo que
+    // `/api/cron/salud` tiene prohibido desde que se escribió.
+    vi.stubEnv('CRON_SECRET', 'secreto-de-retencion')
+
+    const limpio = (await pedir(AUTORIZADO)).status
+
+    await mensajeSinPurgar()
+    const sucio = (await pedir(AUTORIZADO)).status
+
+    // Una clínica del mapa que no existe en la base: no se puede comprobar.
+    process.env.WHATSAPP_CLINICAS = JSON.stringify({
+      '900000000000009': '00000000-0000-4000-8000-000000000009',
+    })
+    olvidarMapa()
+    const sinMirar = (await pedir(AUTORIZADO)).status
+
+    process.env.WHATSAPP_CLINICAS = JSON.stringify({
+      [s.numeroWaA]: s.clinicaA,
+      [s.numeroWaB]: s.clinicaB,
+    })
+    olvidarMapa()
+    vi.unstubAllEnvs()
+
+    expect([limpio, sucio, sinMirar]).toEqual([200, 500, 503])
+    expect(new Set([limpio, sucio, sinMirar]).size).toBe(3)
+  })
+
+  it('SIN el secreto no contesta ni mira: 401 aunque la base este sucia', async () => {
+    vi.stubEnv('CRON_SECRET', 'secreto-de-retencion')
+    await mensajeSinPurgar()
+
+    const respuesta = await pedir({ authorization: 'Bearer el-de-otro' })
+
+    expect(respuesta.status).toBe(401)
+    // Y no ha dejado apunte: un 401 no ejecuta el trabajo.
+    const { count } = await clienteServicio()
+      .from('eventos')
+      .select('id', { count: 'exact', head: true })
+      .eq('tipo', 'retencion')
+    expect(count).toBe(0)
+    vi.unstubAllEnvs()
   })
 
   it('el apunte lleva NUMEROS, nunca una palabra de lo que escribio nadie', async () => {

@@ -11,10 +11,25 @@
  * no es una molestia de mantenimiento: es lo que sostiene por escrito que este
  * sistema no trata datos de salud.
  *
- * Devuelve 200 cuando la comprobacion se ha podido hacer, diga lo que diga el
- * resultado, y 503 cuando alguna clinica no se ha podido comprobar. «Esta
- * sucio» y «no he podido mirar» son cosas distintas, igual que en
- * `/api/cron/salud` lo son un 404 y un fallo de red.
+ * ============== EL CODIGO DE ESTADO ES LA ALARMA ==============
+ *
+ * Tres respuestas distintas, con la misma taxonomia que `/api/cron/salud`:
+ *
+ *   200 · todo limpio.
+ *   500 · SE HA MIRADO Y HAY SUCIEDAD. No se arregla esperando: el job de
+ *         `pg_cron` no esta corriendo y alguien tiene que ir a mirarlo.
+ *   503 · no se ha podido comprobar alguna clinica. Vuelve luego.
+ *
+ * La primera version devolvia 200 tambien con la base sucia, y dejaba la
+ * alarma solo en el cuerpo, en `console.error` y en `eventos`. Es un fallo de
+ * los que no se notan: quien vigila un cron mira el codigo de estado, asi que
+ * la purga podia llevar semanas parada con el panel de Vercel todo en verde.
+ * «Esta sucio» no es «todo bien con un matiz».
+ *
+ * Y «esta sucio» tampoco es «no he podido mirar», igual que en
+ * `/api/cron/salud` un 404 no es un fallo de red: lo primero exige tocar la
+ * base, lo segundo se arregla solo. Hay pruebas de que las tres respuestas
+ * son distintas.
  */
 import { comprobarLaRetencion } from '@/lib/trabajos/retencion'
 import { cerrojoDelCron } from '@/lib/trabajos/cerrojo'
@@ -30,5 +45,8 @@ export async function GET(peticion: Request): Promise<Response> {
   })
 
   const sinComprobar = resumen.porClinica.some((c) => c.error !== undefined)
-  return Response.json(resumen, { status: sinComprobar ? 503 : 200 })
+  if (sinComprobar) return Response.json(resumen, { status: 503 })
+
+  // Se ha mirado. Si queda algo por purgar, esto NO es un 200: ver la cabecera.
+  return Response.json(resumen, { status: resumen.alDia ? 200 : 500 })
 }

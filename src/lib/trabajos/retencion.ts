@@ -41,8 +41,13 @@
  * identificador de conversacion: es un recuento de lo que sobra.
  */
 import type { Registro } from '@/lib/barandillas/contador'
-import { anotarEnEventos, clienteDe, type ClienteDelBot } from '@/lib/whatsapp/almacen'
-import { mapaDeClinicas } from '@/lib/whatsapp/config'
+import {
+  anotarEnEventos,
+  clienteDe,
+  exigirClinicaDelCanal,
+  type ClienteDelBot,
+} from '@/lib/whatsapp/almacen'
+import { mapaDeClinicas, numeroDeLaClinica } from '@/lib/whatsapp/config'
 
 /** Los mismos plazos que la migracion 007. Si alli cambian, aqui tambien. */
 export const DIAS_DE_RETENCION = 90
@@ -125,6 +130,23 @@ export async function comprobarLaRetencion(
     const bot = opciones.cliente ? opciones.cliente(clinicaId) : clienteDe(clinicaId)
 
     try {
+      // ANTES DE CONTAR, EXIGIR QUE LA CLINICA EXISTA. Sin esto, una clinica
+      // que este en `WHATSAPP_CLINICAS` y no en la base sale con los cuatro
+      // recuentos a CERO y se informa como «al dia»: la RLS no devuelve filas
+      // y cero filas es indistinguible de «no hay nada que purgar».
+      //
+      // Es el falso verde de ESTADO_F1 §5.2 —una asercion cuya unica prueba es
+      // una lista vacia pasa igual si la fila no existe— y aqui seria de los
+      // peores: la pantalla diria que la retencion de esa clinica va perfecta
+      // justo cuando no se esta comprobando nada. Lo cazo una prueba que exige
+      // que «limpio», «sucio» y «no he podido mirar» sean TRES respuestas
+      // distintas.
+      //
+      // Se reutiliza el mismo cerrojo que el canal (F4) y que los
+      // recordatorios: el mapa dice de quien es el numero y la base lo
+      // confirma.
+      await exigirClinicaDelCanal(clinicaId, numeroDeLaClinica(clinicaId), bot)
+
       const sobrante: Sobrante = {
         mensajes: await contar(bot, 'mensajes', 'creado_en', corte),
         conversaciones: await contar(bot, 'conversaciones', 'ultima_actividad', corte),
