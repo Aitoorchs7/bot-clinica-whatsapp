@@ -20,6 +20,8 @@
     "bloques": "node scripts/sembrar-bloques.mjs",
     "test:panel": "vitest run tests/panel/",
     "test:panel-vivo": "vitest run tests/panel-vivo/",
+    "test:trabajos": "vitest run tests/trabajos/ tests/cron/",
+    "test:trabajos-vivo": "vitest run tests/trabajos-vivo/",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

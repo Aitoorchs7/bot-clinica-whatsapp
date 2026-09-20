@@ -3,9 +3,10 @@
  *
  * ============== LO QUE HACE HOY NEXT.JS 16.3.5, Y ESTA MEDIDO ==============
  *
- * `.claude/CLAUDE.md` dice que `middleware.ts` «se ignora en silencio y las
+ * `.claude/CLAUDE.md` decia que `middleware.ts` «se ignora en silencio y las
  * rutas quedan publicas». Se comprobo en F5 renombrando este archivo, y en
- * 16.3.5 todavia NO es asi. Lo que sale por la consola al compilar es:
+ * 16.3.5 NO es asi; la regla de CLAUDE.md ya esta corregida (F6, el pendiente
+ * ESTADO_F5 §8.1). Lo que sale por la consola al compilar es:
  *
  *     ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
  *

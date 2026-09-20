@@ -36,9 +36,10 @@ export async function crearClienteServidor() {
           } catch {
             // Desde un Server Component no se pueden escribir cabeceras. No es
             // un error: las cookies refrescadas las escribe proxy.ts en cada
-            // peticion. (proxy.ts, NUNCA middleware.ts: en Next.js 16
-            // middleware.ts se ignora en silencio y las rutas quedan publicas
-            // sin dar ningun error.)
+            // peticion. (proxy.ts, NUNCA middleware.ts: el convenio viejo esta
+            // deprecado desde Next.js 16 y, cuando lo retiren, el guardian
+            // dejara de ejecutarse sin romper ninguna compilacion. Hoy (16.3.5)
+            // todavia corre, con un aviso. Medido en F5: ESTADO_F5 §5.1.)
           }
         },
       },

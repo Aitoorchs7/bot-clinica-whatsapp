@@ -17,11 +17,19 @@ import { TABLAS_CON_PUBLICO, leerEsquema } from '../ayuda/esquema'
 const esquema = leerEsquema()
 
 describe('las migraciones existen', () => {
-  it('hay ocho migraciones, una por tema', () => {
+  it('hay nueve migraciones, una por tema', () => {
     // La octava la anade F5, y solo AÑADE: `auditoria_clinica_insert`, para que
     // el interruptor `publico` del panel pueda dejar rastro de quien lo movio.
     // Ninguna politica anterior cambia. Se pidio confirmacion antes de tocar
     // esta carpeta, que es lo que exige .claude/CLAUDE.md.
+    //
+    // La novena la anade F6, y tambien solo AÑADE: la tabla `recordatorios`
+    // con su unique (clinica_id, cita_id), la clave unica compuesta de `citas`
+    // que la sostiene, y `mantenimiento.liberar_provisionales()` con su job.
+    // Se pidio la misma confirmacion. El motivo de que hiciera falta esta
+    // medido en la cabecera del propio SQL: el bot no puede escribir en una
+    // cita confirmada (cero filas, sin error) ni cancelar una provisional
+    // (42501), asi que ni la marca ni la liberacion cabian donde ya habia sitio.
     expect(esquema.archivos).toEqual([
       '20260916100100_extensiones.sql',
       '20260916100200_tablas.sql',
@@ -31,10 +39,15 @@ describe('las migraciones existen', () => {
       '20260916100600_retencion.sql',
       '20260916100700_integridad.sql',
       '20260919120000_auditoria_panel.sql',
+      '20260920100000_trabajos_programados.sql',
     ])
   })
 
-  it('se han encontrado las 15 tablas del plan', () => {
+  it('se han encontrado las 16 tablas del plan', () => {
+    // Quince de F1 y `recordatorios` de F6. La lista es exacta a proposito: una
+    // tabla nueva tiene que pasar por aqui, y al pasar se lleva por delante
+    // todas las comprobaciones de forma de abajo (RLS activada, una politica
+    // como minimo, ninguna FOR ALL, clinica_id en todas...).
     expect(esquema.tablas).toEqual([
       'auditoria',
       'bloques_prompt',
@@ -50,6 +63,7 @@ describe('las migraciones existen', () => {
       'horarios',
       'mensajes',
       'pacientes',
+      'recordatorios',
       'tratamientos',
     ])
   })

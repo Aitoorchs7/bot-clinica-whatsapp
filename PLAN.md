@@ -195,8 +195,18 @@ un `replace` antes del `fetch` es una garantía.
 - Toda vista se crea con `WITH (security_invoker = true)`.
 - Ninguna función `SECURITY DEFINER` en un esquema expuesto sin justificación
   escrita en un `COMMENT` del propio SQL.
-- **`proxy.ts`, NUNCA `middleware.ts`** — en Next.js 16 `middleware.ts` se
-  ignora en silencio y las rutas quedan públicas sin ningún error.
+- **`proxy.ts`, NUNCA `middleware.ts`** — el convenio viejo está **deprecado**
+  desde Next.js 16, y el día que lo retiren el guardián del panel dejará de
+  ejecutarse **sin romper ninguna compilación y sin poner roja ninguna prueba
+  que mire solo la redirección**.
+  > ⚠️ **Corregido en F5, midiendo.** Este plan decía «se ignora en silencio y
+  > las rutas quedan públicas». En **16.3.5 no es así todavía**: `middleware.ts`
+  > avisa (`⚠ The "middleware" file convention is deprecated`) y **se sigue
+  > ejecutando**, así que renombrar el archivo no dejó el panel abierto. La
+  > regla no cambia —el motivo de arriba la sostiene igual— pero la frase era
+  > falsa. Ver `ESTADO_F5 §5.1`. La misma frase sigue en `.claude/CLAUDE.md` y
+  > en `src/lib/supabase/servidor.ts`, que no se tocan sin confirmación:
+  > `ESTADO_F5 §8.1`.
 
 ### La regla que se descubrió construyendo
 
@@ -219,9 +229,9 @@ solo a todo archivo que use el cliente del bot.
 | **F3** | El motor del bot: cerebro, seis herramientas y clasificador | ✅ Cerrada |
 | **F3b** | Estrechar la RLS a la conversación (`pacientes`, `conversaciones`, `mensajes`) | ⏸ Aparcada |
 | **F4** | El canal de WhatsApp: webhook, envío, plantillas, audio, debounce | ✅ Cerrada |
-| **F5** | El panel de la clínica | ▶ Siguiente |
-| **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ⏳ |
-| **F7** | La barandilla 4 con el modelo real | ⏳ |
+| **F5** | El panel de la clínica | ✅ Cerrada |
+| **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ✅ Cerrada |
+| **F7** | La barandilla 4 con el modelo real | ▶ Siguiente |
 | **F8** | `alta-clinica` y la entrega al cliente | ⏳ |
 
 ### F1 · Base de datos y RLS
@@ -273,17 +283,52 @@ entrega, tokens y coste.
 de poder leer nada. Se **comprueba** después contra
 `clinicas.wa_phone_number_id`. Ver `ESTADO_F4 §3`.
 
-### F5 · El panel (siguiente)
+### F5 · El panel
 
 Para la clínica, no para nosotros: agenda, fichas, FAQ y tratamientos con su
 `publico`, cola de escalados, y las conversaciones en modo lectura. **No hay
 bandeja de respuesta humana en esta versión.**
 
+Siete pantallas y `src/proxy.ts`, que es quien guarda la puerta. Lo que manda
+en la fase:
+
+- **El interruptor `publico` es la superficie de control de la barandilla 1.**
+  Se etiqueta en el idioma del cliente («el asistente puede decir esto» / «solo
+  para el equipo»), encender pide confirmación enseñando el texto exacto, y el
+  cambio deja rastro en `auditoria`.
+- **Ninguna consulta del panel repite un predicado que ya aplica la RLS.** Lo
+  vigila un guardián propio, hermano del del camino del bot.
+- **Playwright entra en juego por primera vez**, y por un motivo que no se
+  podía cubrir de otra forma: que el archivo que protege el panel sea el que
+  Next lee, y que el interruptor llegue hasta el prompt del modelo.
+
+La migración **008** es de aquí, y es la única que F5 añadió: el panel no podía
+dejar rastro en `auditoria` porque no tenía política de `INSERT`. Solo añade.
+
 ### F6 · Trabajos programados
 
-Recordatorios de cita (plantilla `recordatorio_cita`, con botones
-Confirmar/Cancelar), liberación de provisionales caducadas, y la purga de 90
-días. Vercel Cron + `pg_cron`.
+Recordatorios de cita (plantilla `recordatorio_cita`), liberación de
+provisionales caducadas, y la comprobación de que la purga de 90 días —que ya
+existía desde F1— está limpiando de verdad. Vercel Cron + `pg_cron`.
+
+**Es la primera fase que manda mensajes sola**, y eso cambia el criterio: un
+error aquí le llega a un paciente que no ha pedido nada.
+
+- **¿De qué clínica es un cron?** No hay una sola respuesta. La liberación de
+  provisionales **no es de ninguna**: es mantenimiento de la base, lo ejecuta
+  `pg_cron` como `postgres` y no necesita identidad de inquilino. Los
+  recordatorios son **de todas, una detrás de otra**, con `WHATSAPP_CLINICAS` y
+  la misma comprobación contra la base que el webhook. Sigue sin haber
+  `service_role` ni una sola función `SECURITY DEFINER`.
+- **La idempotencia la garantiza la base**, no el proceso: la migración 009 añade
+  `recordatorios` con `unique (clinica_id, cita_id)`. Medido con diez
+  invocaciones concurrentes; sin el índice salen diez recordatorios.
+- **La hora se calcula en la zona horaria de la clínica**, no en la del servidor.
+- **`CANCELAR` no cancela.** Cancelar por WhatsApp está fuera del producto, así
+  que el botón escala a recepción y al paciente se le dice que su cita sigue en
+  pie. Un botón que promete lo que no hace es peor que no tenerlo.
+
+La migración **009** es de aquí, es la única que F6 añadió, y **solo añade**.
 
 ### F7 · La barandilla 4
 
@@ -380,25 +425,62 @@ lo pide **dos veces**:
 
 ## 11 · Pendientes vivos
 
-> **Esta lista tiene dos copias: aquí y en `ESTADO_F4 §8`.** Es deliberado: con
+> **Esta lista tiene dos copias: aquí y en `ESTADO_F6 §8`.** Es deliberado: con
 > F1 casi se pierde un pendiente porque vivía solo en su `ESTADO_*.md`, y eso
 > depende de que alguien se acuerde de releerlo. **Si se toca una, se toca la
 > otra.**
 
+### Cerrado en F6 · La frase de `middleware.ts`, y eran seis sitios
+
+La afirmación «en Next.js 16 `middleware.ts` se ignora en silencio y las rutas
+quedan públicas» **no es cierta en 16.3.5**: está deprecado, avisa y se sigue
+ejecutando. Se midió renombrando el archivo (`ESTADO_F5 §5.1`).
+
+**La regla no cambia** —`proxy.ts`, nunca `middleware.ts`—, y la frase ya está
+corregida con la redacción que dejó propuesta `ESTADO_F5 §8.1`:
+
+| Dónde | Estado |
+|---|---|
+| §6 de este plan | ✅ F5 |
+| `.claude/CLAUDE.md` línea 56 · `src/lib/supabase/servidor.ts` línea 40 | ✅ **F6** |
+| `.claude/agents/revisor-codigo.md` · `src/proxy.ts` | ✅ **F6**, y no estaban en la lista |
+| `ESTADO_F1.md` líneas 80 y 477 | ⚪ No se retoca: un registro cerrado se queda como está |
+
+**Los dos últimos son el aviso que deja este pendiente al morir.** El `grep` de
+F5 dijo «cuatro sitios» y eran seis: se había dejado fuera el archivo que le da
+instrucciones al agente revisor de código —que por tanto buscaba un fallo que ya
+no existe— y la cabecera de `src/proxy.ts`, que *citaba* a `.claude/CLAUDE.md`
+diciendo la frase y se quedaba desmintiendo a su fuente en cuanto se corrigió el
+original. Un `grep` es tan bueno como los términos que se le den.
+
 ### Para F8 · `alta-clinica`
 
 Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
-tres cosas y ninguna está automatizada:
+**cinco** cosas y ninguna está automatizada:
 
 1. **`WHATSAPP_CLINICAS` + redespliegue.** Hay que añadir el par
    `"<phone_number_id>": "<clinica_id>"` a la variable de entorno **y volver a
    desplegar**, además de poner el `wa_phone_number_id` en la fila de
    `clinicas`. Si solo se hace una de las dos, el canal rechaza sus mensajes.
    **Es un coste operativo, no un detalle de configuración.**
+   > ⚠️ **F6 lo agrava.** Hasta ahora, una clínica que faltara en el mapa se
+   > quedaba sin contestar a quien le escribía: molesto, pero **lo nota el
+   > paciente**, que acaba llamando. Ahora además se queda **sin mandar
+   > recordatorios**, y eso no lo nota nadie hasta que alguien no se presenta a
+   > una cita. Ver `ESTADO_F6 §2.2`.
 2. **`mensaje_urgencia`** en `config`. Hoy no existe en ninguna parte del
    repositorio, así que al escalar el paciente recibe el mensaje por defecto:
    correcto y con el teléfono de la clínica, pero genérico.
 3. **`politica_privacidad`** en `config`. Lo usa el bloque «05 - Aviso inicial».
+4. **Los usuarios del panel.** *(Nuevo en F5.)* Hay que crearlos en Supabase
+   Auth con `rol` y `clinica_id` en `app_metadata` —nunca en `user_metadata`—.
+   Hoy los únicos que existen los crea la siembra de las pruebas, así que una
+   clínica recién dada de alta tiene panel y no tiene con qué entrar.
+5. **Aprobar sus plantillas en el panel de Meta.** *(Nuevo en F6.)*
+   `recordatorio_cita` no se ha mandado nunca a un número real, y **sus
+   parámetros son posicionales**: si se aprueba con el cuerpo en otro orden, el
+   paciente recibe la fecha donde va su nombre **sin un solo error**. No hay
+   forma de comprobarlo desde el código.
 
 ### Aparcados
 
@@ -407,8 +489,11 @@ tres cosas y ninguna está automatizada:
   calcular disponibilidad, y estrecharla reintroduciría el bug de V1 por una
   puerta nueva.
 - **F7**, la barandilla 4 con el modelo real.
-- **Los botones de `recordatorio_cita`** no tienen quien los atienda. Hay que
-  decidir qué hace su payload **antes** de mandar la primera plantilla (F6).
+- ~~**Los botones de `recordatorio_cita`** no tienen quien los atienda.~~
+  ✅ **Cerrado en F6.** `CONFIRMAR:<id>` confirma la cita —comprobando que es de
+  esa clínica (RLS) y de ese paciente (teléfono)— y `CANCELAR:<id>` **no
+  cancela**: escala a recepción y le dice al paciente que su cita sigue en pie.
+  Cancelar por WhatsApp está fuera del producto. Ver `ESTADO_F6 §3.2` y §3.3.
 
 ### Infraestructura
 
@@ -416,3 +501,20 @@ tres cosas y ninguna está automatizada:
    obligatorio en Settings → Branches.
 2. La mitad viva no corre en CI: faltan `RLS_VIVA=true` y los cuatro secretos
    `SUPABASE_*_DEV`.
+3. **Las pruebas de navegador tampoco corren en CI.** *(Nuevo en F5.)* Cuando se
+   resuelva el punto 2, el trabajo `rls-viva` puede llevarlas con dos pasos más:
+   `pnpm exec playwright install --with-deps chromium` y `pnpm test:e2e`. No se
+   han añadido a ciegas: un paso de CI que nadie ha visto correr es otra forma
+   de creerse cubierto.
+4. **El horario del cron depende del plan de Vercel.** *(Nuevo en F6.)*
+   `vercel.json` dispara `/api/cron/recordatorios` **cada hora**, y hay planes
+   que solo admiten crons diarios. Si se publica en uno de esos hay que cambiar
+   el horario a diario **y poner `RECORDATORIO_HORAS_ANTES=48`**; si no, las
+   citas de dentro de entre 24 y 48 horas no reciben aviso. Está explicado en
+   `.env.example`, que es donde alguien lo va a leer.
+
+### Una regla de operación que F5 amplía
+
+**Una sola tirada a la vez contra la base de desarrollo** (ESTADO_F3 §5.4),
+ahora contando también Playwright: siembra y limpia **el mismo fixture** que
+Vitest. `pnpm test` y `pnpm test:e2e` a la vez se pisan.

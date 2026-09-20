@@ -28,10 +28,17 @@ desarrollo web y no le restas rigor a la seguridad por ir más rápido.
 - Tailwind v3.4.17, Lucide React
 - Supabase (PostgreSQL, Auth, RLS) — región EU (Frankfurt), por RGPD
 - Gemini API (`@google/genai`), tier gratuito de Google AI Studio:
-  - `gemini-2.5-flash` — cerebro del bot, seis herramientas
-  - `gemini-2.5-flash-lite` — clasificador de urgencia/escalado
+  - `gemini-3.6-flash` — cerebro del bot, seis herramientas
+  - `gemini-3.1-flash-lite` — clasificador de urgencia/escalado
   - `gemini-embedding-001` truncado a 768 dims — embeddings de la FAQ
   - Una sola `GOOGLE_AI_API_KEY` cubre las tres cosas
+  - Antes eran `gemini-2.5-flash` y `gemini-2.5-flash-lite`. Se cambiaron
+    porque devuelven **404 a las claves nuevas** («no longer available to
+    new users», retirados para altas nuevas desde julio de 2026). Lo cazó
+    `tests/bot-contrato` el 18/09/2026; el detalle y los diez candidatos que
+    se probaron, en ESTADO_F3 §7.1. Van clavados a una versión y no a un
+    alias como `gemini-flash-latest`: un modelo que cambia solo invalidaría
+    la auditoría de fuga sin que nadie se entere.
 - Deepgram (`nova-3`, es) para notas de voz, con vocabulario dental propio
 - WhatsApp Business Cloud API (Meta, oficial) — nunca Baileys ni
   whatsapp-web.js en producción
@@ -46,8 +53,10 @@ desarrollo web y no le restas rigor a la seguridad por ir más rápido.
 - Componentes en TypeScript, no JS
 - Todo el texto de cara al paciente, en español de España
 - No crees archivos si puedes editar uno existente
-- `proxy.ts`, NUNCA `middleware.ts` — en Next.js 16 `middleware.ts` se
-  ignora en silencio y las rutas quedan públicas sin ningún error
+- `proxy.ts`, **nunca** `middleware.ts`: el convenio viejo está deprecado
+  desde Next.js 16 y, cuando lo retiren, el guardián dejará de ejecutarse
+  sin romper ninguna compilación. Hoy (16.3.5) todavía corre, con un aviso.
+  Medido en F5 renombrando el archivo — ver ESTADO_F5 §5.1
 - Antes de tocar un archivo, completa el contrato de cinco campos:
   ENTREGA, PRUEBA, LÍMITES, SUPUESTOS, FALLOS. Al cerrar, ejecuta PRUEBA
   y pega la salida real — no reescribas el contrato para que encaje con

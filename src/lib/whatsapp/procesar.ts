@@ -11,6 +11,7 @@
  *   3 · el switch                texto / audio / boton / lo que no se puede leer
  *   4 · GUARDAR el entrante      <- aqui nace el `mensaje_id` del escalado
  *   5 · ventana de 24 h          se reinicia con cada entrante
+ *  5b · BOTON DE CITA            si lo es, se atiende AQUI y se acaba (F6)
  *   6 · DEBOUNCE                 8 s; si llego otro, esta rama se calla
  *   7 · historial                de la base, no de memoria
  *   8 · responder()              el motor de F3, con `mensajeId` puesto
@@ -44,6 +45,7 @@ import {
 import { agrupar, concatenar } from './agrupar'
 import { PEDIR_POR_ESCRITO, textoDeLaNotaDeVoz } from './audio'
 import { textoDelEntrante, type Entrante, type EstadoEntrante } from './botones'
+import { atenderBotonDeCita } from './confirmar'
 import { clinicaDelNumero } from './config'
 import { responderAlPaciente, type OpcionesDeEnvio } from './enviar'
 import { avisarAlEquipo } from './escalado'
@@ -95,6 +97,12 @@ export type OpcionesDeProceso = {
 
 export type ResultadoDelProceso =
   | { readonly hecho: 'contestado'; readonly respuesta: RespuestaDelBot; readonly mensajeId: number }
+  | {
+      /** Un boton de `recordatorio_cita`. No pasa por el motor: ver `confirmar.ts`. */
+      readonly hecho: 'boton'
+      readonly que: 'confirmada' | 'ya_estaba' | 'escalada' | 'no_es_suya'
+      readonly mensajeId: number
+    }
   | { readonly hecho: 'agrupado' }
   | { readonly hecho: 'sin_soporte' }
   | { readonly hecho: 'audio_ilegible' }
@@ -225,6 +233,55 @@ export async function procesarMensaje(
   const ahora = opciones.ahora ?? new Date()
   const expira = expiraTras(ahora)
   await guardarVentana(cliente, conversacion.id, expira)
+
+  // 5b · Un boton de `recordatorio_cita`, si lo es. VA AQUI Y NO MAS ABAJO:
+  //
+  //   - Despues del paso 4 porque el escalado de «Cancelar» necesita el
+  //     `mensaje_id` del mensaje que lo disparo, y ese id nace ahi.
+  //   - Antes del debounce porque pulsar un boton no es escribir: no hay nada
+  //     que agrupar, y hacer esperar ocho segundos a quien confirma su cita
+  //     seria cobrarle la latencia de un problema que no tiene.
+  //   - Antes del motor porque confirmar una cita no es una conversacion. El
+  //     mensaje trae el identificador exacto; pedirle al modelo que adivine a
+  //     cual se referia «Confirmar» seria inventarse una ambiguedad.
+  const porBoton = await atenderBotonDeCita(
+    entrante,
+    { clinicaId, clinica, conversacionId: conversacion.id, mensajeId },
+    cliente,
+    registro,
+  )
+
+  if (porBoton) {
+    await contestarSinModelo(
+      { clinicaId, conversacion: conversacion.id, entrante, clinica },
+      porBoton.texto,
+      cliente,
+      opciones,
+    )
+
+    if (porBoton.avisar) {
+      await avisarAlEquipo(
+        {
+          clinicaId,
+          nombreClinica: clinica.nombre,
+          telefonoRecepcion: clinica.telefono_recepcion,
+          emailAvisos: clinica.email_avisos,
+          phoneNumberId: entrante.phoneNumberId,
+          telefonoPaciente: entrante.telefono,
+          motivo: porBoton.avisar.motivo,
+          asunto: porBoton.avisar.asunto,
+        },
+        {
+          ...(opciones.envio ?? {}),
+          ...(opciones.fetchEmail ? { fetchEmail: opciones.fetchEmail } : {}),
+          ...(registro ? { registro } : {}),
+        },
+      )
+    }
+
+    await anotarEnEventos(clinicaId, 'boton_de_cita', { hecho: porBoton.hecho }, cliente, registro)
+    return { hecho: 'boton', que: porBoton.hecho, mensajeId }
+  }
 
   // 6 · El debounce. Si llego otro mensaje, esta rama se calla.
   const grupo = await agrupar(clinicaId, conversacion.id, mensajeId, {

@@ -25,6 +25,12 @@
  * Ni red, ni base, ni reloj. Entra un JSON y sale una lista. Asi se puede
  * comprobar con cargas reales de Meta sin levantar nada.
  */
+// Los dos prefijos salen de `plantillas.ts`, que es quien los ESCRIBE en el
+// boton. No se vuelven a teclear aqui a proposito: el dia que alguien cambie
+// «CONFIRMAR» alli, el parser tiene que cambiar con el o los botones dejan de
+// funcionar en silencio. `plantillas.ts` no importa nada, asi que no hay ciclo.
+import { PAYLOAD_CANCELAR, PAYLOAD_CONFIRMAR } from './plantillas'
+
 // ---------------------------------------------------------------------------
 // Lo que manda Meta, leido a la defensiva
 // ---------------------------------------------------------------------------
@@ -269,6 +275,42 @@ export function leerCarga(carga: unknown): Leido {
   }
 
   return { mensajes, estados }
+}
+
+// ---------------------------------------------------------------------------
+// El payload de los botones de `recordatorio_cita`
+// ---------------------------------------------------------------------------
+
+/**
+ * `CONFIRMAR:<uuid>` / `CANCELAR:<uuid>` -> algo con forma. PURO.
+ *
+ * LO QUE ESTA FUNCION NO HACE, Y ES LO IMPORTANTE
+ *
+ * No autoriza nada. Devolver `{accion:'confirmar', citaId}` no significa que
+ * esa cita sea de quien pulso el boton: significa que el payload tiene la
+ * forma que escribimos nosotros en `plantillas.ts`. Un payload que llega de
+ * fuera es ENTRADA DEL USUARIO, y quien comprueba de quien es la cita es
+ * `procesar.ts` contra la base, con la RLS delante.
+ *
+ * Se exige que el identificador tenga forma de uuid por higiene —asi un
+ * `CONFIRMAR:' or 1=1--` ni siquiera llega a la consulta— pero eso es una
+ * criba, no la garantia.
+ */
+export type AccionDeCita = { readonly accion: 'confirmar' | 'cancelar'; readonly citaId: string }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export function leerPayloadDeCita(payload: string): AccionDeCita | undefined {
+  const corte = payload.indexOf(':')
+  if (corte < 0) return undefined
+
+  const cabeza = payload.slice(0, corte)
+  const citaId = payload.slice(corte + 1).trim()
+  if (!UUID.test(citaId)) return undefined
+
+  if (cabeza === PAYLOAD_CONFIRMAR) return { accion: 'confirmar', citaId }
+  if (cabeza === PAYLOAD_CANCELAR) return { accion: 'cancelar', citaId }
+  return undefined
 }
 
 /**
