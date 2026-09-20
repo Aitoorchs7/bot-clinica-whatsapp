@@ -104,6 +104,42 @@ clínica, no en Claude Opus 5 como documentaba V1. Antes de dar por bueno
 el cambio, pasa la barandilla 4 (auditoría de fuga) con Gemini y confirma
 que sigue sin decir nada fuera de lo aprobado.
 
+# Un verde no es una garantía
+
+Un resultado limpio —cero filas, un 200, ningún error— significa
+exactamente lo mismo si todo va bien que si no se ha comprobado nada. Ha
+pasado **tres veces** en este proyecto, las tres con ese disfraz:
+
+- **F1 §5.2.** «El rol lectura no puede cambiar nada» pasó en verde porque
+  la fila ya no existía: un test destructivo doce líneas más arriba la
+  había borrado. Verde por ausencia, no por permiso.
+- **F6, la limpieza destructiva.** Un `afterEach` que borraba por un
+  teléfono y un motivo que el fixture también usaba se llevaba la
+  conversación y el escalado sembrados. Salieron catorce rojos en cuatro
+  archivos ajenos — esta vez con suerte: el mismo mecanismo, un poco más
+  callado, deja **verdes** a los de al lado.
+- **F6, la clínica fantasma.** Una clínica que estaba en el entorno y no en
+  la base salía con todos los recuentos a cero y se informaba **como al
+  día**: la RLS no devuelve filas para una clínica que no existe, y cero
+  filas es indistinguible de «no hay nada que purgar».
+
+**Antes de dar una prueba por buena, pregúntate qué pasaría si la garantía
+real no existiera — y demuéstralo en rojo.** Si la prueba seguiría verde,
+no está midiendo la garantía: está midiendo otra cosa. Que la suite corra
+demuestra que corre; solo verla ponerse roja donde debe demuestra que mira.
+
+En la práctica:
+
+- Una aserción negativa cuya única prueba es una lista vacía tiene que
+  exigir primero que la fila exista, y comprobarlo con un rol distinto del
+  que se está probando.
+- «No he podido comprobarlo» nunca se informa igual que «está todo bien».
+- Una prueba que escribe para demostrar que se puede escribir tiene que
+  escribir **el valor que ya estaba**: si no, cambia el mundo para los que
+  vienen detrás y el daño aparece en el archivo de al lado.
+- Romper una garantía a propósito va en la **misma orden** que su
+  restauración (`trap volver EXIT`), nunca en pasos sueltos.
+
 # Reglas de conversación que no se negocian
 
 - El modelo NUNCA inventa un hueco de cita. Solo dice lo que devuelve
