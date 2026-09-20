@@ -162,13 +162,15 @@ describeVivo('bloques_prompt', () => {
     s = sembrado()
   })
 
-  it('bloques_prompt_bot_select: el bot ve el bloque activo', async () => {
+  it('bloques_prompt_bot_select: el bot ve los bloques activos y solo esos', async () => {
     const bot = clienteBot(s.clinicaA)
     const { data, error } = await bot.from('bloques_prompt').select('id')
 
     expect(error).toBeNull()
-    expect(data).toHaveLength(1)
-    expect((data as { id: string }[])[0]!.id).toBe(s.bloqueAActivo)
+    // Los bloques reales de contenido/bloques/ que estan activos, mas el de
+    // atrezo. El de atrezo inactivo y los reales inactivos no salen.
+    expect(data).toHaveLength(s.bloquesRealesActivos + 1)
+    expect((data as { id: string }[]).map((f) => f.id)).toContain(s.bloqueAActivo)
   })
 
   it('bloques_prompt_bot_select: el bot NO ve el bloque desactivado', async () => {
@@ -201,10 +203,14 @@ describeVivo('bloques_prompt', () => {
       .select('id')
     expect(intento).toEqual([])
 
+    // Se reescribe con el titulo que ya tenia. Un test que deja la fila con
+    // otro nombre es destructivo aunque pase: el guion bajo de delante es lo
+    // que hace que el montador descarte este bloque, y quitarselo aqui lo
+    // metería en el prompt de las pruebas de F2 (ver ESTADO_F1 §5.2).
     const propietario = await clienteUsuario(USUARIOS.aPropietario.email, CONTRASENA)
     const { data, error } = await propietario
       .from('bloques_prompt')
-      .update({ titulo: 'Quien es' })
+      .update({ titulo: '_atrezo rls activo' })
       .eq('id', s.bloqueAActivo)
       .select('id')
     expect(error).toBeNull()

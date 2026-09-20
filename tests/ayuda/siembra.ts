@@ -10,6 +10,10 @@
  * los tests probarian la RLS contra datos que la RLS misma dejo entrar, y no
  * probarian nada.
  */
+// El mismo lector que usa `pnpm bloques`. Las pruebas no pueden sembrar un
+// prompt distinto del que se siembra en produccion: seria comprobar otra cosa.
+import { filasParaClinica } from '../../scripts/bloques-a-filas.mjs'
+
 import { MARCADOR } from './entorno'
 import { clienteServicio } from './clientes'
 
@@ -24,9 +28,26 @@ export const USUARIOS = {
 
 const SLUGS = ['rls-prueba-a', 'rls-prueba-b'] as const
 
+/**
+ * El `phone_number_id` de cada clinica dentro de la WABA.
+ *
+ * Lo necesita F4: es lo que dice de que clinica es cada webhook. La resolucion
+ * arranca en `WHATSAPP_CLINICAS` (entorno) porque la RLS del rol `bot` exige
+ * saber ya de que clinica eres, pero despues se COMPRUEBA contra esta columna,
+ * y sin sembrarla la comprobacion falla siempre.
+ *
+ * Dos distintos a proposito: sirven para probar que un webhook de la clinica B
+ * no se atiende con la identidad de la A.
+ */
+export const NUMERO_WA_A = '900000000000001'
+export const NUMERO_WA_B = '900000000000002'
+
 export type Sembrado = {
   clinicaA: string
   clinicaB: string
+  /** El `phone_number_id` de cada una. Lo usa el canal de WhatsApp (F4). */
+  numeroWaA: string
+  numeroWaB: string
   gabineteA1: string
   gabineteA2: string
   gabineteB1: string
@@ -37,9 +58,13 @@ export type Sembrado = {
   faqAConfidencial: string
   faqBPublica: string
   configAPublica: string
+  configAPrivacidad: string
   configAConfidencial: string
   bloqueAActivo: string
   bloqueAInactivo: string
+  /** Cuantos bloques reales se sembraron, y cuantos de ellos activos. */
+  bloquesReales: number
+  bloquesRealesActivos: number
   pacienteA: string
   pacienteB: string
   conversacionA: string
@@ -144,6 +169,7 @@ export async function sembrar(): Promise<Sembrado> {
   const clinicaA = await insertar(db, 'clinicas', {
     nombre: 'Clinica de prueba A',
     slug: 'rls-prueba-a',
+    wa_phone_number_id: NUMERO_WA_A,
     telefono_recepcion: '+34910000001',
     email_avisos: 'avisos-a@ejemplo.test',
     zona_horaria: 'Europe/Madrid',
@@ -151,6 +177,7 @@ export async function sembrar(): Promise<Sembrado> {
   const clinicaB = await insertar(db, 'clinicas', {
     nombre: 'Clinica de prueba B',
     slug: 'rls-prueba-b',
+    wa_phone_number_id: NUMERO_WA_B,
     telefono_recepcion: '+34910000002',
     email_avisos: 'avisos-b@ejemplo.test',
     zona_horaria: 'Europe/Madrid',
@@ -237,6 +264,15 @@ export async function sembrar(): Promise<Sembrado> {
     valor: 'Calle Mayor 1',
     publico: true,
   })
+  // La usa el bloque «05 - Aviso inicial»: el enlace que el bot tiene que dar
+  // en su primer mensaje sale de aqui, no del texto del prompt, para que la
+  // clinica pueda cambiarlo sin tocar codigo.
+  const configAPrivacidad = await insertar(db, 'config', {
+    clinica_id: clinicaA.id,
+    clave: 'politica_privacidad',
+    valor: 'https://ejemplo.test/privacidad',
+    publico: true,
+  })
   const configAConfidencial = await insertar(db, 'config', {
     clinica_id: clinicaA.id,
     clave: 'margen_comercial',
@@ -244,17 +280,28 @@ export async function sembrar(): Promise<Sembrado> {
     publico: false,
   })
 
+  // Los bloques DE VERDAD, leidos de contenido/bloques/ por el mismo codigo que
+  // usa el script de alta. La clinica A es la clinica de desarrollo: si el
+  // prompt se monta aqui, se monta en produccion, porque es el mismo texto.
+  const bloquesReales = filasParaClinica(clinicaA.id)
+  const errBloques = (await db.from('bloques_prompt').insert(bloquesReales)).error
+  if (errBloques) throw new Error(`Sembrando bloques_prompt: ${errBloques.message}`)
+
+  // Y ademas, dos bloques de atrezo para las pruebas de RLS de F1. Van con
+  // `orden` 900 y 910 para no chocar con los reales, y con el titulo empezando
+  // por `_` para que el montador los descarte: asi la regla del guion bajo se
+  // comprueba contra datos que existen de verdad, en vez de inventados.
   const bloqueAActivo = await insertar(db, 'bloques_prompt', {
     clinica_id: clinicaA.id,
-    orden: 10,
-    titulo: 'Quien es',
+    orden: 900,
+    titulo: '_atrezo rls activo',
     contenido: 'Eres el asistente virtual de {{clinica}}.',
     activo: true,
   })
   const bloqueAInactivo = await insertar(db, 'bloques_prompt', {
     clinica_id: clinicaA.id,
-    orden: 20,
-    titulo: 'Borrador sin aprobar',
+    orden: 910,
+    titulo: '_atrezo rls inactivo',
     contenido: `Borrador con ${MARCADOR}.`,
     activo: false,
   })
@@ -367,6 +414,8 @@ export async function sembrar(): Promise<Sembrado> {
   return {
     clinicaA: clinicaA.id,
     clinicaB: clinicaB.id,
+    numeroWaA: NUMERO_WA_A,
+    numeroWaB: NUMERO_WA_B,
     gabineteA1: gabineteA1.id,
     gabineteA2: gabineteA2.id,
     gabineteB1: gabineteB1.id,
@@ -377,9 +426,12 @@ export async function sembrar(): Promise<Sembrado> {
     faqAConfidencial: faqAConfidencial.id,
     faqBPublica: faqBPublica.id,
     configAPublica: configAPublica.id,
+    configAPrivacidad: configAPrivacidad.id,
     configAConfidencial: configAConfidencial.id,
     bloqueAActivo: bloqueAActivo.id,
     bloqueAInactivo: bloqueAInactivo.id,
+    bloquesReales: bloquesReales.length,
+    bloquesRealesActivos: bloquesReales.filter((b) => b.activo).length,
     pacienteA: pacienteA.id,
     pacienteB: pacienteB.id,
     conversacionA: conversacionA.id,
