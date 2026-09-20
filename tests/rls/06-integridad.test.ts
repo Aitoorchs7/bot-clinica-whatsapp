@@ -13,7 +13,7 @@
  * La mitad estatica corre sin base de datos, en el trabajo
  * `comprobaciones-estaticas` de .github/workflows/ci.yml.
  */
-import { beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it, onTestFinished } from 'vitest'
 
 import { crearClienteBot } from '@/lib/supabase/bot'
 
@@ -285,12 +285,24 @@ describeVivo('007 · comportamiento contra la base de datos', () => {
     // RESTRICT, este test se pone rojo y la limpieza de los demas tambien.
     const db = clienteServicio()
 
+    // Esta clinica NO la conoce limpiar(): solo borra rls-prueba-a y -b. Si el
+    // test se cae a medias, se queda aqui con su paciente y su cita, y la
+    // siguiente tirada muere en exigirBaseDeDesarrollo -- que hace bien su
+    // trabajo: ve filas que no son de las clinicas de prueba y se niega a
+    // sembrar. El borrado del final es la ASERCION; esto es la red.
+    onTestFinished(async () => {
+      await clienteServicio().from('clinicas').delete().eq('slug', 'rls-prueba-baja')
+    })
+
     const nueva = await db
       .from('clinicas')
       .insert({
         nombre: 'Clinica de baja',
         slug: 'rls-prueba-baja',
         telefono_recepcion: '+34910000009',
+        // not null en la migracion 002. Sin esto el alta muere con un 23502 y
+        // el test no llega a probar lo que dice probar.
+        email_avisos: 'avisos-baja@ejemplo.test',
       } as never)
       .select('id')
       .single()

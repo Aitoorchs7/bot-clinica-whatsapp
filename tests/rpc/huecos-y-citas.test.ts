@@ -123,7 +123,11 @@ describeVivo('crear_cita', () => {
 
   async function crear(clinica: string, argumentos: Record<string, unknown>) {
     const bot = clienteBot(clinica)
-    const { data, error } = await bot.rpc('crear_cita', argumentos)
+    // `argumentos` es a proposito un Record suelto: varios tests de aqui abajo
+    // llaman al RPC con argumentos incompletos o invalidos justamente para ver
+    // como los rechaza. El cast mantiene esa libertad sin apagar los tipos del
+    // resto del archivo.
+    const { data, error } = await bot.rpc('crear_cita', argumentos as never)
     return { resultado: data as unknown as Resultado, error }
   }
 

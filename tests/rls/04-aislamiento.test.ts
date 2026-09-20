@@ -10,6 +10,8 @@
  * anon daria verde aunque la RLS estuviera apagada. Eso es exactamente el fallo
  * que este archivo esta escrito para no cometer.
  */
+import { randomUUID } from 'node:crypto'
+
 import { beforeAll, expect, it } from 'vitest'
 
 import { clienteAnon, clienteBot, clienteUsuario } from '../ayuda/clientes'
@@ -17,23 +19,30 @@ import { MARCADOR } from '../ayuda/entorno'
 import { CONTRASENA, USUARIOS, type Sembrado } from '../ayuda/siembra'
 import { describeVivo, sembrado } from '../ayuda/vivo'
 
-/** Las 15 tablas, y que fila sembrada de la clinica A no debe verse desde B. */
+/**
+ * Las 15 tablas, y que fila sembrada de la clinica A no debe verse desde B.
+ *
+ * `columna` es por donde se reconoce el inquilino de cada fila. En las catorce
+ * de abajo es `clinica_id`; en `clinicas` es `id`, porque esa tabla ES la raiz
+ * del inquilino y no se apunta a si misma. Pedirle `clinica_id` devolvia un
+ * 42703 y esta comprobacion no probaba nada sobre `clinicas`.
+ */
 const TABLAS = [
-  { tabla: 'clinicas', fila: (s: Sembrado) => s.clinicaA },
-  { tabla: 'gabinetes', fila: (s: Sembrado) => s.gabineteA1 },
-  { tabla: 'tratamientos', fila: (s: Sembrado) => s.tratamientoAPublico },
-  { tabla: 'horarios', fila: null },
-  { tabla: 'config', fila: (s: Sembrado) => s.configAPublica },
-  { tabla: 'faq', fila: (s: Sembrado) => s.faqAPublica },
-  { tabla: 'bloques_prompt', fila: (s: Sembrado) => s.bloqueAActivo },
-  { tabla: 'pacientes', fila: (s: Sembrado) => s.pacienteA },
-  { tabla: 'conversaciones', fila: (s: Sembrado) => s.conversacionA },
-  { tabla: 'citas', fila: (s: Sembrado) => s.citaA },
-  { tabla: 'mensajes', fila: (s: Sembrado) => String(s.mensajeA) },
-  { tabla: 'escalados', fila: (s: Sembrado) => s.escaladoA },
-  { tabla: 'eventos_webhook', fila: (s: Sembrado) => String(s.eventoWebhookA) },
-  { tabla: 'eventos', fila: (s: Sembrado) => String(s.eventoA) },
-  { tabla: 'auditoria', fila: (s: Sembrado) => String(s.auditoriaA) },
+  { tabla: 'clinicas', columna: 'id', fila: (s: Sembrado) => s.clinicaA },
+  { tabla: 'gabinetes', columna: 'clinica_id', fila: (s: Sembrado) => s.gabineteA1 },
+  { tabla: 'tratamientos', columna: 'clinica_id', fila: (s: Sembrado) => s.tratamientoAPublico },
+  { tabla: 'horarios', columna: 'clinica_id', fila: null },
+  { tabla: 'config', columna: 'clinica_id', fila: (s: Sembrado) => s.configAPublica },
+  { tabla: 'faq', columna: 'clinica_id', fila: (s: Sembrado) => s.faqAPublica },
+  { tabla: 'bloques_prompt', columna: 'clinica_id', fila: (s: Sembrado) => s.bloqueAActivo },
+  { tabla: 'pacientes', columna: 'clinica_id', fila: (s: Sembrado) => s.pacienteA },
+  { tabla: 'conversaciones', columna: 'clinica_id', fila: (s: Sembrado) => s.conversacionA },
+  { tabla: 'citas', columna: 'clinica_id', fila: (s: Sembrado) => s.citaA },
+  { tabla: 'mensajes', columna: 'clinica_id', fila: (s: Sembrado) => String(s.mensajeA) },
+  { tabla: 'escalados', columna: 'clinica_id', fila: (s: Sembrado) => s.escaladoA },
+  { tabla: 'eventos_webhook', columna: 'clinica_id', fila: (s: Sembrado) => String(s.eventoWebhookA) },
+  { tabla: 'eventos', columna: 'clinica_id', fila: (s: Sembrado) => String(s.eventoA) },
+  { tabla: 'auditoria', columna: 'clinica_id', fila: (s: Sembrado) => String(s.auditoriaA) },
 ] as const
 
 describeVivo('aislamiento entre clinicas', () => {
@@ -44,13 +53,13 @@ describeVivo('aislamiento entre clinicas', () => {
 
   it.each(TABLAS)(
     '$tabla: el propietario de la clinica B no ve NADA de la clinica A',
-    async ({ tabla }) => {
+    async ({ tabla, columna }) => {
       const otro = await clienteUsuario(USUARIOS.bPropietario.email, CONTRASENA)
-      const { data, error } = await otro.from(tabla).select('clinica_id')
+      const { data, error } = await otro.from(tabla).select(columna)
 
       expect(error).toBeNull()
-      for (const fila of (data ?? []) as { clinica_id: string }[]) {
-        expect(fila.clinica_id).not.toBe(s.clinicaA)
+      for (const fila of (data ?? []) as Record<string, string>[]) {
+        expect(fila[columna]).not.toBe(s.clinicaA)
       }
     },
   )
@@ -124,7 +133,12 @@ describeVivo('un JWT sin app_metadata no es nadie', () => {
   it('un clinica_id inexistente no abre ninguna puerta', async () => {
     // Firmar un token no basta: tiene que apuntar a una clinica que exista, y
     // aun asi solo ve lo suyo.
-    const inventado = clienteBot('00000000-0000-0000-0000-000000000000')
+    //
+    // Un uuid v4 de verdad, no el nulo. El nulo no es v4 y bot.ts lo rechaza
+    // antes de firmar, que es lo correcto: lo que hay que probar aqui es que la
+    // RLS no devuelve nada para una clinica que no existe, no el validador de
+    // formato. Con el nulo, este test moria antes de tocar la base de datos.
+    const inventado = clienteBot(randomUUID())
     const { data } = await inventado.from('faq').select('id')
 
     expect(data ?? []).toEqual([])
