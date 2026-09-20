@@ -2,19 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Un panel de clinica es una herramienta de trabajo, no una pagina de
+ * presentacion: se mira ocho horas al dia, con un paciente esperando delante.
+ * De ahi las tres decisiones de esta hoja:
+ *
+ *   · UN SOLO TEMA, CLARO. Sin modo oscuro a medias. Media pantalla en oscuro
+ *     y media en claro es peor que cualquiera de las dos enteras, y aqui no
+ *     hay a quien preguntarle cual prefiere.
+ *   · El texto nunca es negro puro: #111 sobre hueso cansa menos que #000
+ *     sobre blanco.
+ *   · Una sola linea, de 1px, para todo. Ni sombras ni degradados.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --hueso: #f7f6f3;
+  --papel: #ffffff;
+  --linea: #eaeaea;
+  --tinta: #111111;
+  --apagado: #787774;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--hueso);
+  color: var(--tinta);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* El foco se ve. Media agenda se lleva con el teclado. */
+:focus-visible {
+  outline: 2px solid var(--tinta);
+  outline-offset: 2px;
+}
+
+/* Las tablas del panel: cabecera fina, filas separadas por una linea. */
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tabla th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--apagado);
+  padding: 0 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--linea);
+}
+
+.tabla td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--linea);
+  vertical-align: top;
+}
+
+.tabla tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

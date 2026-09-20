@@ -10,8 +10,18 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:rls": "vitest run tests/rls",
+    "test:bot": "vitest run tests/bot/",
+    "test:bot-vivo": "vitest run tests/bot-vivo/",
+    "test:contrato": "vitest run tests/bot-contrato/",
+    "test:whatsapp": "vitest run tests/whatsapp/",
+    "test:whatsapp-vivo": "vitest run tests/whatsapp-vivo/",
     "test:watch": "vitest",
-    "tipos": "node scripts/generar-tipos.mjs"
+    "tipos": "node scripts/generar-tipos.mjs",
+    "bloques": "node scripts/sembrar-bloques.mjs",
+    "test:panel": "vitest run tests/panel/",
+    "test:panel-vivo": "vitest run tests/panel-vivo/",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
