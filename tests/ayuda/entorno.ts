@@ -56,3 +56,38 @@ export function avisarSiNoHayBaseDeDatos() {
  * que el bot no debe ver nunca.
  */
 export const MARCADOR = 'ZZMARGEN-7f3a'
+
+export const CLAVE_GEMINI = process.env.GOOGLE_AI_API_KEY ?? ''
+
+/**
+ * ¿Se pueden correr las pruebas que llaman a Gemini DE VERDAD?
+ *
+ * Hacen falta las dos cosas: la clave y un `GEMINI_VIVO=1` puesto a mano. Tener
+ * la clave en `.env.local` NO basta, y esa es toda la idea.
+ *
+ * En F1 el hallazgo mas serio fue una suite no determinista por agotar el
+ * limite de peticiones de Supabase Auth. El equivalente aqui es peor: el limite
+ * del tier gratuito de Gemini es DIARIO, asi que una suite que lo agote no
+ * vuelve a estar verde hasta el dia siguiente, y el modelo ademas no es
+ * determinista entre dos tiradas. Una bateria que se pone roja por la cuota
+ * ensena a la gente a ignorar el rojo, que es la peor cosa que le puede pasar a
+ * una bateria de seguridad.
+ *
+ * Asi que `pnpm test` no gasta ni una peticion. Ver ESTADO_F3 §1.
+ */
+export const HAY_GEMINI = Boolean(CLAVE_GEMINI) && process.env.GEMINI_VIVO === '1'
+
+export function avisarSiNoHayGemini() {
+  if (HAY_GEMINI) return
+  console.warn(
+    [
+      '',
+      '  ⓘ  Las pruebas de CONTRATO con Gemini se han saltado (es lo normal).',
+      '     Para correrlas:  GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato',
+      '',
+      '     Gastan cuota del tier gratuito, que es diaria. Todo lo demas del',
+      '     motor se comprueba sin llamar al modelo.',
+      '',
+    ].join('\n'),
+  )
+}

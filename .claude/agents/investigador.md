@@ -25,8 +25,11 @@ primarias, no recuerdos.
   y su aprobación, precio por plantilla entregada, `X-Hub-Signature-256`
   sobre el cuerpo CRUDO, códigos de error y reintentos de Meta.
 - **Gemini (Google AI Studio)**: límites reales del tier gratuito por día y
-  por minuto, y si `gemini-2.5-flash`, `flash-lite` y `gemini-embedding-001`
-  comparten cuota. Dimensiones admitidas al truncar el embedding.
+  por minuto, y si `gemini-3.6-flash`, `gemini-3.1-flash-lite` y
+  `gemini-embedding-001` comparten cuota. Dimensiones admitidas al truncar el
+  embedding. Y **qué modelos siguen disponibles para una clave nueva**: los
+  `2.5` se retiraron para altas nuevas y devuelven 404 (ESTADO_F3 §7.1), así
+  que un modelo que aparece en la lista de la API no siempre se puede llamar.
 - **Supabase/Postgres**: RLS, `security_invoker`, `EXCLUDE USING gist`,
   pgvector e índices, `pg_cron`.
 - **Normativa**: art. 9 del RGPD (datos de salud), art. 50 del Reglamento
