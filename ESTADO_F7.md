@@ -36,10 +36,10 @@ rojo rompiéndola a propósito.
 - La mitad de la fuga que llama a Gemini **no cabe entera en un día** en el
   tier gratuito: el límite es de **20 peticiones diarias por modelo** (§5).
 - Los quince guiones **no llaman al modelo real**, y está razonado en §3.2.
-- De los tres fallos de producto que ha encontrado la fase (§4), se arregla
-  **uno** —el `thought_signature`, por decisión expresa— y con su propio
-  contrato. Los otros dos se informan. De `src/` sólo se tocan `gemini.ts` y
-  una línea de `cerebro.ts`.
+- De los fallos de producto que ha encontrado la fase (§4), se arreglan **dos**
+  por decisión expresa y cada uno con su contrato: el `thought_signature`
+  (§4.1) y el borrador del canal (§4.2, con la migración 010, que **sólo
+  añade** dos columnas). Queda informado el doble apunte de `auditoria` (§4.3).
 - **El arreglo no está confirmado contra Gemini**: la cuota diaria se agotó
   con la batería de §5. Lo que se afirma y lo que no, en §4.1.
 
@@ -383,11 +383,13 @@ Se decidió arreglarlo dentro de esta fase. El contrato, y lo que salió:
   correr `GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas`
   mañana, con cuota, antes de dar el fallo por cerrado.
 
-### 4.2 · 🔴 El canal no le pasa al motor ni el borrador ni las rondas
+### 4.2 · 🔴 → ✅ El canal no le pasaba al motor ni el borrador ni las rondas
 
-> **Subido de 🟠 a 🔴 el 21/09/2026, después de medirlo.** Se informó primero
-> como «el borrador no sobrevive entre mensajes», que suena a degradación. Lo
-> medido es peor: **una cita pedida en cuatro mensajes no se llega a coger.**
+> **Subido de 🟠 a 🔴 el 21/09/2026 después de medirlo, y arreglado el mismo
+> día.** Se informó primero como «el borrador no sobrevive entre mensajes»,
+> que suena a degradación. Lo medido era peor: **una cita pedida en cuatro
+> mensajes no se llegaba a coger.** Arreglado con la migración 010 — ver el
+> final de esta sección.
 
 `src/lib/whatsapp/procesar.ts` llama a `responder()` **sin** `borrador` ni
 `rondasDeAclaracion` (comprobado con `grep`: no aparecen en todo
@@ -436,11 +438,83 @@ garantía, es una lotería. El prompt y el canal se contradicen, y gana el canal
 Así que son **dos** defectos independientes encontrados por F7 que bloquean el
 caso de uso principal: éste y el `thought_signature` de §4.1.
 
-#### La prueba es de caracterización, y tiene fecha de caducidad
+#### ✅ Arreglado, con su contrato, y con una migración que sólo añade
 
-Deja medido lo que pasa HOY para que el arreglo tenga contra qué compararse.
-**El día que `procesar.ts` enhebre el borrador, esa prueba se pondrá roja**:
-entonces hay que **borrarla**, no arreglarla. Lo dice su propia cabecera.
+Se decidió arreglarlo en esta fase, y la confirmación para tocar
+`supabase/migrations/` se pidió y se dio, igual que con la 008 de F5 y la 009
+de F6.
+
+**Migración 010 · `20260921120000_borrador_de_la_conversacion.sql`.** Dos
+columnas en `conversaciones` y nada más:
+
+- `borrador jsonb not null default '{}'` — el `Borrador` de `herramientas.ts`.
+  `jsonb` y no seis columnas a propósito: mientras la cita está a medias **no
+  es una fila de nada**, y darle columnas propias invita a consultarlo como si
+  fuera una agenda.
+- `rondas_aclaracion smallint not null default 0`.
+
+**Por qué en `conversaciones` y no en otro sitio:** dura lo que tiene que durar
+el borrador; `pacientes` no vale porque el borrador es justo lo que **todavía
+no** es un paciente (escribirlo allí dejaría fichas de gente que empezó a pedir
+cita y se fue, que es la distinción que V1 dejó medida); y `conversaciones`
+**sí** la purga `purgar_historial` a los 90 días, que es donde debe vivir un
+dato a medias.
+
+**Ninguna política nueva ni tocada**, y se comprobó **antes** de escribir el
+SQL: `conversaciones_bot_update` no lleva lista de columnas y en todo
+`supabase/migrations/` no hay un solo `grant` por columna. El bot ya escribía
+en esa tabla desde F4 (`guardarVentana`).
+
+**Y eso se leyó, que no es comprobarlo.** `guardarBorrador()` pide
+`.select('id')` y exige una fila, porque el fallo de la 009 se repite aquí
+calcado: **un UPDATE que no alcanza ninguna fila devuelve cero filas y ningún
+error**. Si la política no dejara, el borrador se guardaría «bien» sin
+guardarse, cada mensaje volvería a creerse el primero, y el síntoma sería el de
+antes — pero ya sin nadie mirando, porque habría una función con nombre bonito
+diciendo que lo guarda. Lo mide una prueba propia.
+
+#### 🔴 Y la lección: la prueba de caracterización SIGUIÓ VERDE tras el arreglo
+
+La primera versión llamaba a `responder()` **copiando a mano la convención de
+`procesar.ts`**. Medía bien el agujero. Pero al arreglar `procesar.ts` se quedó
+en verde — y tenía razón: no estaba mirando el canal, estaba mirando **una
+copia del canal que yo había escrito al lado**. `procesar.ts` cambió y la copia
+no, porque las copias no cambian solas.
+
+Es ESTADO_F3 §1 con otra cara: «un doble que imitara el bucle de herramientas
+comprobaría el doble, no el bot». Aquí el doble no era el modelo: **era el
+llamante**. Y un llamante de mentira comprueba al llamante de mentira.
+
+Reescrita para entrar por `procesarMensaje()`, la función que corre de verdad
+cuando a una clínica le escribe un paciente. Sólo se simula lo que habla con
+fuera —Meta y el modelo—; la base de datos, el debounce, el guardado de
+mensajes, la ventana de 24 h y el motor entero corren de verdad.
+
+**Tres pruebas en `tests/guiones/01-como-llama-el-canal.test.ts`:**
+
+1. Cuatro mensajes de WhatsApp → **una cita en la base**, con el modelo
+   obedeciendo el bloque 50 al pie de la letra (no repesca nada de mensajes
+   anteriores). Comprueba además que la ficha se creó al pasar la puerta y que
+   el borrador se vació al reservar, dejando sólo el teléfono.
+2. **Una sola ronda de aclaración**: la primera queda contada en la base y en
+   la segunda `no_te_entiendo` manda escalar en vez de repreguntar.
+3. El borrador que no se guarda **no se informa como guardado**.
+
+**En rojo**, quitando sólo las dos líneas que enhebran el borrador:
+
+```
+× CUATRO MENSAJES DE WHATSAPP -> UNA CITA EN LA BASE
+AssertionError: Cuatro mensajes pidiendo cita y no hay ninguna en la base…
+  expected [] to have a length of 1 but got +0
+```
+
+> Y de paso, dos rojos del propio probador que conviene no barrer: las cuatro
+> respuestas salientes se guardaban con el mismo `wamid` falso y el índice
+> único de `mensajes` las rechazaba. Lo cazó la aserción `quejas === []`, que
+> está ahí precisamente porque `procesar.ts` **se traga a propósito** los
+> fallos de envío —un error ahí haría que Meta reintentara el webhook y el
+> paciente lo recibiera todo dos veces—. Sin mirar las quejas, esa prueba
+> podía estar verde con el guardado roto del todo.
 
 ### 4.3 · 🟡 `04-interruptor.spec.ts:189` falla, y no es de esta fase
 
@@ -615,18 +689,18 @@ $ pnpm exec tsc --noEmit
 
 ```
  Test Files  43 passed | 3 skipped (46)
-      Tests  988 passed | 36 skipped (1024)
+      Tests  989 passed | 36 skipped (1025)
 
  Test Files  43 passed | 3 skipped (46)
-      Tests  988 passed | 36 skipped (1024)
+      Tests  989 passed | 36 skipped (1025)
 
 $ diff <(grep -E "Test Files|Tests " f7-1.txt) <(grep -E "Test Files|Tests " f7-2.txt)
 IDENTICO
 ```
 
-**El mismo número dos veces seguidas.** De 829 a **988**: +159 pruebas (130 de
-la batería de fuga, 17 de los guiones, 5 de la firma de pensamiento, 2 de la
-caracterización del canal, 4 del barrido de RLS con `recordatorios`, y el resto
+**El mismo número dos veces seguidas.** De 829 a **989**: +160 pruebas (130 de
+la batería de fuga, 17 de los guiones, 5 de la firma de pensamiento, 3 del
+canal de punta a punta, 4 del barrido de RLS con `recordatorios`, y el resto
 los controles positivos). Los 36
 saltados son los de contrato y los 30 de la fuga con Gemini, que se piden a
 mano — y hoy, además, no tienen cuota.
@@ -725,16 +799,13 @@ es exactamente lo que el nombre del trabajo promete y nada más.
    producción que nadie haya comprobado.** Es lo primero de mañana.
 2. **🔴 El merge no está bloqueado (§6.1).** Decisión de producto, no de
    código: público, de pago, o se borra la frase.
-3. **🔴 El canal no pasa `borrador` ni `rondasDeAclaracion` (§4.2).** Medido:
-   una cita en cuatro mensajes devuelve `faltan_datos` y deja CERO filas. El
-   arreglo necesita un sitio donde viva el borrador entre mensajes, y eso es
-   una migración que **sólo añade** dos columnas a `conversaciones`
-   (`borrador jsonb`, `rondas_aclaracion smallint`). Comprobado que no hace
-   falta tocar ninguna política: `conversaciones_bot_update` no lleva lista de
-   columnas y no hay `grant` por columna en ninguna migración. `conversaciones`
-   además **sí** la purga el job de los 90 días, que es donde debe vivir un
-   dato a medias. **Pendiente de la confirmación explícita que pide
-   `.claude/CLAUDE.md` para tocar `supabase/migrations/`.**
+3. ~~**🔴 El canal no pasa `borrador` ni `rondasDeAclaracion` (§4.2).**~~
+   ✅ **Cerrado**: migración 010 y el cableado de `procesar.ts`. Cuatro
+   mensajes de WhatsApp dejan una cita en la base, visto también en rojo.
+   **Queda una cosa de operación:** la 010 está aplicada en desarrollo
+   (`supabase db push`) y **no** en producción, porque no hay producción
+   todavía. Cuando la haya, es la primera que tiene que subir — sin ella el
+   canal lee dos columnas que no existen y no contesta a nadie.
 4. **🟡 `04-interruptor.spec.ts:189` (§4.3).** Dos apuntes de `auditoria` por
    un clic.
 5. **El CI no ha corrido desde el 16/09.** Faltan los cuatro secretos

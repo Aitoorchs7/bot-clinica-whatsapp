@@ -534,22 +534,16 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    proteccion de rama: `GET /rulesets` devuelve `403 · "Upgrade to GitHub Pro
    or make this repository public"`. O publico, o de pago, o se borra la frase
    «bloquea el merge» de donde este. Decision de producto. Ver `ESTADO_F7` §6.1.
-3. **🔴 El canal no le pasa al motor `borrador` ni `rondasDeAclaracion`, y
-   por eso NO SE COGEN CITAS.** `procesar.ts:308` llama a `responder()` sin las
-   dos. Medido con la convencion exacta del canal
-   (`tests/guiones/01-como-llama-el-canal.test.ts`): una cita pedida en cuatro
-   mensajes devuelve `faltan_datos` y deja CERO filas.
-   Y no vale «que el modelo vuelva a anotar»: el bloque 50 se lo PROHIBE
-   —«nunca anotes algo que el paciente no acabe de decir»—, asi que el modelo
-   que obedece no reserva y el que reserva desobedece. El prompt y el canal se
-   contradicen.
-   El arreglo necesita un sitio donde viva el borrador entre mensajes: una
-   migracion que SOLO AÑADE `borrador jsonb` y `rondas_aclaracion smallint` a
-   `conversaciones`. Comprobado que no toca ninguna politica
-   (`conversaciones_bot_update` no lleva lista de columnas, y no hay grants por
-   columna), y `conversaciones` si la purga el job de los 90 dias. Pendiente de
-   la confirmacion explicita que exige `.claude/CLAUDE.md` para tocar
-   `supabase/migrations/`.
+3. ~~**🔴 El canal no le pasa al motor `borrador` ni `rondasDeAclaracion`.**~~
+   ✅ **Cerrado en F7 con la migracion 010**, que SOLO ANADE `borrador jsonb` y
+   `rondas_aclaracion smallint` a `conversaciones`. Antes NO SE COGIAN CITAS:
+   `procesar.ts` llamaba a `responder()` sin el borrador, cada mensaje
+   empezaba de cero y `crear_cita` moria en `faltan_datos`. Y no se podia
+   arreglar en el prompt, porque el bloque 50 PROHIBE volver a anotar lo que
+   el paciente no acabe de decir. Ahora cuatro mensajes de WhatsApp dejan una
+   cita en la base, y se ha visto en rojo quitando el cableado.
+   ⚠️ **La 010 esta aplicada en desarrollo y no en produccion** (no hay
+   produccion todavia). Cuando la haya, es la primera que sube.
 4. **🟡 Un clic del interruptor deja DOS apuntes en `auditoria`.**
    `tests/e2e/04-interruptor.spec.ts:189` lo caza. Los dos con `antes: true`,
    a 2,1 s: apunta a dos envios concurrentes de la accion. **Es anterior a F7**

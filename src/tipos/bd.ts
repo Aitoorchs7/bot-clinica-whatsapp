@@ -274,34 +274,40 @@ export type Database = {
       }
       conversaciones: {
         Row: {
+          borrador: Json
           clinica_id: string
           estado: Database["public"]["Enums"]["estado_conversacion"]
           id: string
           iniciada_en: string
           paciente_id: string | null
           requiere_humano: boolean
+          rondas_aclaracion: number
           telefono_e164: string
           ultima_actividad: string
           ventana_24h_expira: string | null
         }
         Insert: {
+          borrador?: Json
           clinica_id: string
           estado?: Database["public"]["Enums"]["estado_conversacion"]
           id?: string
           iniciada_en?: string
           paciente_id?: string | null
           requiere_humano?: boolean
+          rondas_aclaracion?: number
           telefono_e164: string
           ultima_actividad?: string
           ventana_24h_expira?: string | null
         }
         Update: {
+          borrador?: Json
           clinica_id?: string
           estado?: Database["public"]["Enums"]["estado_conversacion"]
           id?: string
           iniciada_en?: string
           paciente_id?: string | null
           requiere_humano?: boolean
+          rondas_aclaracion?: number
           telefono_e164?: string
           ultima_actividad?: string
           ventana_24h_expira?: string | null

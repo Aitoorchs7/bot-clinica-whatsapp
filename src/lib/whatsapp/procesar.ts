@@ -39,6 +39,7 @@ import {
   costeEur,
   exigirClinicaDelCanal,
   guardarMensaje,
+  guardarBorrador,
   historialDe,
   type ClienteDelBot,
 } from './almacen'
@@ -312,12 +313,50 @@ export async function procesarMensaje(
     mensaje: concatenar(grupo.textos),
     historial,
     mensajeId,
+    // ---------------------------------------------------------------------
+    // EL BORRADOR Y LAS RONDAS, QUE HASTA F7 NO SE PASABAN.
+    //
+    // `responder()` los admite desde F3 y este archivo nunca se los dio, asi
+    // que cada mensaje empezaba con el borrador vacio y NO SE COGIA NINGUNA
+    // CITA: `crear_cita` moria en `faltan_datos` porque le faltaban el
+    // nombre, los apellidos, el telefono y el tratamiento — los datos que el
+    // paciente habia dado dos mensajes antes.
+    //
+    // Y no se podia arreglar pidiendole al modelo que volviera a anotarlos,
+    // porque el bloque 50 se lo prohibe: «nunca anotes algo que el paciente no
+    // acabe de decir». El modelo que obedecia no reservaba. Ver ESTADO_F7 §4.2
+    // y la migracion 010.
+    //
+    // `rondas_aclaracion` es lo mismo por el otro lado: llegando siempre a 0,
+    // `RONDAS_MAXIMAS` no se aplicaba nunca y `no_te_entiendo` podia pedir una
+    // aclaracion detras de otra. El bucle que `.claude/CLAUDE.md` prohibe.
+    // ---------------------------------------------------------------------
+    borrador: conversacion.borrador,
+    rondasDeAclaracion: conversacion.rondas_aclaracion,
     modelo: cerebro,
     modeloClasificador: clasificador,
     cliente,
     ...(registro ? { registro } : {}),
     ahora,
   })
+
+  // 8b · Y se guardan para el mensaje siguiente, ANTES de enviar.
+  //
+  // Antes de enviar a proposito: si el envio se cae, el paciente reescribe y
+  // la conversacion sigue donde estaba. Guardandolo despues, un fallo de Meta
+  // se llevaria por delante lo que el paciente ya habia contado.
+  //
+  // Las rondas se cuentan aqui y no en el motor porque el motor no tiene
+  // memoria entre mensajes: es este archivo el que sabe cuantas llevaba.
+  await guardarBorrador(
+    cliente,
+    clinicaId,
+    conversacion.id,
+    respuesta.borrador,
+    conversacion.rondas_aclaracion +
+      respuesta.herramientasUsadas.filter((h) => h === 'no_te_entiendo').length,
+    registro,
+  )
 
   // 9 y 10 · Enviar y guardar lo enviado.
   await mandarYGuardar(

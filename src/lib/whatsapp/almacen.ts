@@ -22,6 +22,8 @@
  */
 import { crearClienteBot } from '@/lib/supabase/bot'
 import type { Registro } from '@/lib/barandillas/contador'
+import type { Json } from '@/tipos/bd'
+import type { Borrador } from '@/lib/bot/herramientas'
 import type { Turno } from '@/lib/bot/historial'
 
 export type ClienteDelBot = ReturnType<typeof crearClienteBot>
@@ -108,10 +110,63 @@ export async function exigirClinicaDelCanal(
 // La conversacion
 // ---------------------------------------------------------------------------
 
+/**
+ * Las columnas de `conversaciones` que necesita el canal.
+ *
+ * En una constante y no repetidas cuatro veces: `conversacionAbierta` las pide
+ * en cuatro sitios —la que existe, la que se crea, y la que se recupera tras
+ * una carrera— y en F7 se anadieron dos. Olvidar una sola de las cuatro deja
+ * el borrador a `undefined` en el camino menos transitado, que es justo el que
+ * nadie prueba.
+ */
+/**
+ * Una fila de `conversaciones` tal y como la devuelve PostgREST.
+ *
+ * `borrador` llega como `Json`, que incluye `null` y cualquier otra cosa. La
+ * columna es `not null default '{}'`, asi que en la practica es un objeto —
+ * pero eso lo garantiza el esquema, no el tipo que llega, y este archivo no da
+ * por bueno lo que no ha mirado. Un `borrador` que no sea un objeto se trata
+ * como vacio: se pierde lo que hubiera, que es molesto, en vez de reventar la
+ * conversacion de un paciente, que es peor.
+ */
+function comoBorrador(valor: unknown): Borrador {
+  if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) return {}
+  return valor as Borrador
+}
+
+function aConversacion(fila: {
+  id: string
+  ventana_24h_expira: string | null
+  paciente_id: string | null
+  borrador: unknown
+  rondas_aclaracion: number | null
+}): Conversacion {
+  return {
+    id: fila.id,
+    ventana_24h_expira: fila.ventana_24h_expira,
+    paciente_id: fila.paciente_id,
+    borrador: comoBorrador(fila.borrador),
+    rondas_aclaracion: fila.rondas_aclaracion ?? 0,
+  }
+}
+
+const COLUMNAS_CONVERSACION = 'id, ventana_24h_expira, paciente_id, borrador, rondas_aclaracion'
+
 export type Conversacion = {
   readonly id: string
   readonly ventana_24h_expira: string | null
   readonly paciente_id: string | null
+  /**
+   * Lo que se sabe de la cita a medias, de un mensaje al siguiente.
+   *
+   * Es el `Borrador` de `herramientas.ts` tal y como lo dejo el mensaje
+   * anterior. Viene de la columna `conversaciones.borrador` (migracion 010) y
+   * existe porque sin el NO SE COGIAN CITAS: cada mensaje empezaba de cero y
+   * `crear_cita` moria en `faltan_datos`. Ver ESTADO_F7 §4.2.
+   */
+  readonly borrador: Borrador
+  /** Cuantas aclaraciones se han pedido ya. Contra `RONDAS_MAXIMAS`. */
+  readonly rondas_aclaracion: number
 }
 
 /**
@@ -132,7 +187,7 @@ export async function conversacionAbierta(
 
   const existente = await bot
     .from('conversaciones')
-    .select('id, ventana_24h_expira, paciente_id')
+    .select(COLUMNAS_CONVERSACION)
     .eq('telefono_e164', telefono)
     .eq('estado', 'abierta')
     .maybeSingle()
@@ -140,28 +195,94 @@ export async function conversacionAbierta(
   if (existente.error) {
     throw new Error(`Buscando la conversacion: ${existente.error.message}`)
   }
-  if (existente.data) return existente.data
+  if (existente.data) return aConversacion(existente.data)
 
   const creada = await bot
     .from('conversaciones')
     .insert({ clinica_id: clinicaId, telefono_e164: telefono, estado: 'abierta' })
-    .select('id, ventana_24h_expira, paciente_id')
+    .select(COLUMNAS_CONVERSACION)
     .single()
 
-  if (creada.data) return creada.data
+  if (creada.data) return aConversacion(creada.data)
 
   if (creada.error?.code === '23505') {
     const segunda = await bot
       .from('conversaciones')
-      .select('id, ventana_24h_expira, paciente_id')
+      .select(COLUMNAS_CONVERSACION)
       .eq('telefono_e164', telefono)
       .eq('estado', 'abierta')
       .single()
-    if (segunda.data) return segunda.data
+    if (segunda.data) return aConversacion(segunda.data)
     throw new Error(`Carrera al abrir conversacion y no se recupera: ${segunda.error?.message}`)
   }
 
   throw new Error(`Abriendo la conversacion: ${creada.error?.message}`)
+}
+
+/**
+ * Guarda el borrador y las rondas para el mensaje SIGUIENTE.
+ *
+ * ================== POR QUE ESTO COMPRUEBA LO QUE HA ESCRITO ==================
+ *
+ * Es la leccion de la migracion 009, literal: en PostgREST, **un UPDATE que no
+ * alcanza ninguna fila devuelve CERO FILAS Y NINGUN ERROR**. Se midio en F6
+ * intentando marcar una cita confirmada con el rol del bot:
+ *
+ *     UPDATE de una cita confirmada -> filas=0  error=ninguno
+ *
+ * Si `conversaciones_bot_update` no dejara escribir estas dos columnas, esta
+ * funcion volveria sin queja y el borrador NO se guardaria. Y el sintoma seria
+ * exactamente el de antes de la migracion 010 —cada mensaje creyendose el
+ * primero, ninguna cita cogida— pero esta vez sin nadie mirando, porque ya
+ * habria una funcion con nombre bonito que dice que lo guarda.
+ *
+ * Por eso pide `.select('id')` y mira lo que vuelve. Una fila. Si no, grita.
+ *
+ * NO TUMBA LA CONVERSACION. Igual que el contador de la barandilla 2: el
+ * paciente ya tiene su respuesta y perder el borrador es molesto, no grave.
+ * Lo que no se hace es tragarselo en silencio.
+ */
+export async function guardarBorrador(
+  cliente: ClienteDelBot | undefined,
+  clinicaId: string,
+  conversacionId: string,
+  borrador: Borrador,
+  rondasDeAclaracion: number,
+  registro?: Registro,
+): Promise<boolean> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  // Sin `.eq('clinica_id', ...)`: la RLS ya acota la fila al inquilino del
+  // token y repetirlo aqui es lo que prohibe
+  // `tests/barandillas/04-sin-filtro-en-codigo.test.ts`. Mismo criterio que
+  // `guardarVentana`.
+  const { data, error } = await bot
+    .from('conversaciones')
+    .update({
+      // El tipo generado de una columna `jsonb` es `Json`, y `Borrador` es un
+      // objeto plano de strings: encaja, pero TypeScript no lo deduce solo.
+      borrador: borrador as unknown as Json,
+      rondas_aclaracion: rondasDeAclaracion,
+      ultima_actividad: new Date().toISOString(),
+    })
+    .eq('id', conversacionId)
+    .select('id')
+
+  if (error) {
+    registro?.error(`  ⚠  No se ha podido guardar el borrador: ${error.message}`)
+    return false
+  }
+
+  if ((data ?? []).length !== 1) {
+    registro?.error(
+      '  ⚠  El borrador se ha «guardado» sin guardarse: el UPDATE no ha alcanzado ninguna ' +
+        'fila y PostgREST no da error por eso. Mira conversaciones_bot_update: sin esto, ' +
+        'cada mensaje vuelve a creerse el primero y no se coge ninguna cita.',
+    )
+    return false
+  }
+
+  return true
 }
 
 // ---------------------------------------------------------------------------

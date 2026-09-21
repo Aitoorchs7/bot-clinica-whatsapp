@@ -17,7 +17,7 @@ import { TABLAS_CON_PUBLICO, leerEsquema } from '../ayuda/esquema'
 const esquema = leerEsquema()
 
 describe('las migraciones existen', () => {
-  it('hay nueve migraciones, una por tema', () => {
+  it('hay diez migraciones, una por tema', () => {
     // La octava la anade F5, y solo AÑADE: `auditoria_clinica_insert`, para que
     // el interruptor `publico` del panel pueda dejar rastro de quien lo movio.
     // Ninguna politica anterior cambia. Se pidio confirmacion antes de tocar
@@ -30,6 +30,16 @@ describe('las migraciones existen', () => {
     // medido en la cabecera del propio SQL: el bot no puede escribir en una
     // cita confirmada (cero filas, sin error) ni cancelar una provisional
     // (42501), asi que ni la marca ni la liberacion cabian donde ya habia sitio.
+    //
+    // La decima la anade F7, y SOLO ANADE DOS COLUMNAS a `conversaciones`:
+    // `borrador` y `rondas_aclaracion`. Ni una politica nueva, ninguna tocada.
+    // Hizo falta porque HASTA ENTONCES NO SE COGIAN CITAS: `procesar.ts`
+    // llamaba a `responder()` sin el borrador, asi que cada mensaje empezaba
+    // de cero y `crear_cita` moria en `faltan_datos` con el nombre y el
+    // telefono que el paciente habia dado dos mensajes antes. Y no se podia
+    // arreglar en el prompt: el bloque 50 PROHIBE volver a anotar lo que el
+    // paciente no acabe de decir. Se pidio la misma confirmacion. El motivo,
+    // medido, en la cabecera del propio SQL y en ESTADO_F7 §4.2.
     expect(esquema.archivos).toEqual([
       '20260916100100_extensiones.sql',
       '20260916100200_tablas.sql',
@@ -40,6 +50,7 @@ describe('las migraciones existen', () => {
       '20260916100700_integridad.sql',
       '20260919120000_auditoria_panel.sql',
       '20260920100000_trabajos_programados.sql',
+      '20260921120000_borrador_de_la_conversacion.sql',
     ])
   })
 
