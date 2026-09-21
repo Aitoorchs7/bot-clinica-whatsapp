@@ -260,6 +260,10 @@ async function conversarConElModelo(entrada: {
         tipo: 'llamada' as const,
         nombre: llamada.nombre,
         argumentos: llamada.argumentos,
+        // La firma de pensamiento viaja de vuelta con su llamada. Sin esta
+        // linea, la vuelta siguiente se va en un 400 contra Gemini 3: ver
+        // FIRMA DE PENSAMIENTO en gemini.ts y ESTADO_F7 §4.1.
+        ...(llamada.firma === undefined ? {} : { firma: llamada.firma }),
       })),
     })
 

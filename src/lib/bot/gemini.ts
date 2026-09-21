@@ -34,6 +34,27 @@
  *   - `respuesta.functionCalls`
  *
  * Si un dia dejan de existir, lo que se rompe es este archivo y solo este.
+ *
+ * FIRMA DE PENSAMIENTO (`thoughtSignature`) — ANADIDO EN F7, Y COSTO UN 400
+ *
+ * Gemini 3 pone una firma opaca en cada `functionCall` que predice, y EXIGE
+ * que se le devuelva cuando se le manda esa llamada de vuelta. Si no:
+ *
+ *   400 INVALID_ARGUMENT · «Function call is missing a thought_signature in
+ *   functionCall parts. This is required for tools to work correctly...»
+ *
+ * O sea: la SEGUNDA vuelta del bucle de herramientas —la que hace que una
+ * cita se llegue a coger— moria. En produccion.
+ *
+ * La trampa esta en DONDE vive la firma: no dentro del `FunctionCall`, sino al
+ * lado, en la `Part` que lo envuelve. `respuesta.functionCalls`, que es el
+ * atajo comodo del SDK, devuelve los `FunctionCall` desnudos y la tira por el
+ * camino sin avisar. Por eso `preguntar()` recorre las partes a mano.
+ *
+ * Y no lo cazo nadie hasta F7 porque `tests/bot-contrato/01-gemini` hace todas
+ * sus llamadas de UNA vuelta: ninguna le devuelve al modelo una llamada que el
+ * modelo acababa de hacer. El unico sitio donde eso pasaba era produccion.
+ * Ahora hay una prueba que lo hace: `02-bucle-herramientas`.
  */
 import { GoogleGenAI, type Content, type FunctionDeclaration, type Part } from '@google/genai'
 
@@ -78,6 +99,14 @@ export type Parte =
       readonly tipo: 'llamada'
       readonly nombre: string
       readonly argumentos: Record<string, unknown>
+      /**
+       * La `thoughtSignature` con la que vino esta llamada. Ver FIRMA, abajo.
+       *
+       * Opcional porque no todas las llamadas la traen, y porque las pruebas
+       * que arman turnos a mano no tienen ninguna que poner. Cuando la hay,
+       * TIENE que volver: sin ella, la vuelta siguiente es un 400.
+       */
+      readonly firma?: string
     }
   | { readonly tipo: 'resultado'; readonly nombre: string; readonly resultado: unknown }
 
@@ -101,6 +130,8 @@ export type Peticion = {
 export type LlamadaAHerramienta = {
   readonly nombre: string
   readonly argumentos: Record<string, unknown>
+  /** La firma de pensamiento que hay que devolverle. Ver FIRMA, abajo. */
+  readonly firma?: string
 }
 
 export type Respuesta = {
@@ -128,7 +159,12 @@ export function aContenido(turnos: readonly TurnoDelModelo[]): Content[] {
     parts: turno.partes.map((parte): Part => {
       if (parte.tipo === 'texto') return { text: parte.texto }
       if (parte.tipo === 'llamada') {
-        return { functionCall: { name: parte.nombre, args: parte.argumentos } }
+        return {
+          functionCall: { name: parte.nombre, args: parte.argumentos },
+          // La firma vuelve por donde vino: al lado del functionCall, no
+          // dentro. Ver FIRMA DE PENSAMIENTO, en la cabecera.
+          ...(parte.firma === undefined ? {} : { thoughtSignature: parte.firma }),
+        }
       }
       return {
         functionResponse: {
@@ -184,10 +220,41 @@ export function modeloDeGoogle(): Modelo {
       },
     })
 
-    const llamadas = (respuesta.functionCalls ?? []).map((llamada) => ({
-      nombre: llamada.name ?? '',
-      argumentos: (llamada.args ?? {}) as Record<string, unknown>,
-    }))
+    // -------------------------------------------------------------------
+    // Las llamadas salen de las PARTES, no de `respuesta.functionCalls`.
+    //
+    // `functionCalls` es un atajo del SDK que devuelve los `FunctionCall` ya
+    // desnudos, y la `thoughtSignature` NO esta dentro del functionCall: esta
+    // al lado, en la Part que lo envuelve (`Part.thoughtSignature`,
+    // genai.d.ts). Usando el atajo se perdia, y sin ella la vuelta siguiente
+    // del bucle se va en un 400. Ver FIRMA DE PENSAMIENTO en la cabecera.
+    // -------------------------------------------------------------------
+    const partes = respuesta.candidates?.[0]?.content?.parts ?? []
+
+    const deLasPartes = partes.flatMap((parte) =>
+      parte.functionCall
+        ? [
+            {
+              nombre: parte.functionCall.name ?? '',
+              argumentos: (parte.functionCall.args ?? {}) as Record<string, unknown>,
+              ...(parte.thoughtSignature === undefined
+                ? {}
+                : { firma: parte.thoughtSignature }),
+            },
+          ]
+        : [],
+    )
+
+    // Reserva: si un dia una respuesta trajera `functionCalls` sin partes que
+    // recorrer, perder las llamadas seria peor que perder la firma. Se queda
+    // el camino viejo, y se nota en el log porque no llevara firma.
+    const llamadas =
+      deLasPartes.length > 0
+        ? deLasPartes
+        : (respuesta.functionCalls ?? []).map((llamada) => ({
+            nombre: llamada.name ?? '',
+            argumentos: (llamada.args ?? {}) as Record<string, unknown>,
+          }))
 
     return {
       // `?? ''` y no un error: un turno que solo trae llamadas a herramienta no
