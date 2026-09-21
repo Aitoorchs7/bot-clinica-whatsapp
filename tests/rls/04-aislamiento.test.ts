@@ -12,20 +12,34 @@
  */
 import { randomUUID } from 'node:crypto'
 
-import { beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { clienteAnon, clienteBot, clienteUsuario } from '../ayuda/clientes'
+import { clienteAnon, clienteBot, clienteServicio, clienteUsuario } from '../ayuda/clientes'
 import { MARCADOR } from '../ayuda/entorno'
+import { leerEsquema } from '../ayuda/esquema'
 import { CONTRASENA, USUARIOS, type Sembrado } from '../ayuda/siembra'
 import { describeVivo, sembrado } from '../ayuda/vivo'
 
 /**
- * Las 15 tablas, y que fila sembrada de la clinica A no debe verse desde B.
+ * Las 16 tablas, y que fila sembrada de la clinica A no debe verse desde B.
  *
- * `columna` es por donde se reconoce el inquilino de cada fila. En las catorce
+ * `columna` es por donde se reconoce el inquilino de cada fila. En las quince
  * de abajo es `clinica_id`; en `clinicas` es `id`, porque esa tabla ES la raiz
  * del inquilino y no se apunta a si misma. Pedirle `clinica_id` devolvia un
  * 42703 y esta comprobacion no probaba nada sobre `clinicas`.
+ *
+ * ⚠ SON DIECISEIS DESDE F7, Y ERAN QUINCE DESDE F1.
+ *
+ * `recordatorios` la creo la migracion 009 en F6 y se quedo fuera de esta
+ * lista. No fue inocuo: la mitad estatica (`00-rls-activada`) SI la cogia
+ * —deriva la lista de los .sql y la nombra— asi que el barrido salia verde y
+ * nadie echaba en falta la fila diecisexta. La mitad viva, que es la que
+ * demuestra que la politica esta PUESTA y no solo escrita, no la miraba.
+ *
+ * Es el aviso que deja esta fase: una lista escrita a mano al lado de una que
+ * se deriva sola acaba desincronizada, y el tick verde de al lado tapa el
+ * hueco. Lo vigila ahora la primera prueba del describe, que compara esta
+ * lista con la que salga de `leerEsquema()`.
  */
 const TABLAS = [
   { tabla: 'clinicas', columna: 'id', fila: (s: Sembrado) => s.clinicaA },
@@ -43,12 +57,55 @@ const TABLAS = [
   { tabla: 'eventos_webhook', columna: 'clinica_id', fila: (s: Sembrado) => String(s.eventoWebhookA) },
   { tabla: 'eventos', columna: 'clinica_id', fila: (s: Sembrado) => String(s.eventoA) },
   { tabla: 'auditoria', columna: 'clinica_id', fila: (s: Sembrado) => String(s.auditoriaA) },
+  // F6 · migracion 009. La fila la crea este archivo en su `beforeAll`, no la
+  // siembra global: `trabajos-vivo/01-recordatorios` borra en su `afterEach`
+  // TODOS los recordatorios de las dos clinicas de prueba, asi que una fila
+  // sembrada globalmente desapareceria segun que archivo corriera antes y
+  // este barrido pasaria a ser verde por ausencia — que es exactamente el
+  // fallo que F6 documenta con su nombre.
+  { tabla: 'recordatorios', columna: 'clinica_id', fila: () => String(recordatorioA) },
 ] as const
+
+/**
+ * El recordatorio de la clinica A, creado y borrado por este archivo.
+ *
+ * `let` y no una constante porque su id lo da la base al insertar. Vive fuera
+ * del `describe` porque `TABLAS` se evalua al cargar el modulo.
+ */
+let recordatorioA = 0
 
 describeVivo('aislamiento entre clinicas', () => {
   let s: Sembrado
-  beforeAll(() => {
+
+  beforeAll(async () => {
     s = sembrado()
+
+    // La fila de `recordatorios` de la clinica A. Se crea aqui, se borra aqui,
+    // y no la ve ningun otro archivo.
+    const db = clienteServicio()
+    const { data, error } = await db
+      .from('recordatorios')
+      .insert({ clinica_id: s.clinicaA, cita_id: s.citaA })
+      .select('id')
+      .single()
+    if (error) throw new Error(`Sembrando el recordatorio del aislamiento: ${error.message}`)
+    recordatorioA = Number((data as { id: number }).id)
+  })
+
+  afterAll(async () => {
+    if (recordatorioA) await clienteServicio().from('recordatorios').delete().eq('id', recordatorioA)
+  })
+
+  /**
+   * LA LISTA DE ARRIBA CONTRA LAS MIGRACIONES, NO CONTRA LA MEMORIA.
+   *
+   * Sin esto, la proxima tabla que añada una migracion se quedara fuera del
+   * barrido igual que se quedo `recordatorios` en F6, y el archivo seguira en
+   * verde diciendo que ha comprobado el aislamiento «tabla por tabla».
+   */
+  it('la lista cubre TODAS las tablas de supabase/migrations', () => {
+    const { tablas } = leerEsquema()
+    expect(TABLAS.map((t) => t.tabla).sort()).toEqual([...tablas].sort())
   })
 
   it.each(TABLAS)(
@@ -81,6 +138,28 @@ describeVivo('aislamiento entre clinicas', () => {
     '$tabla: una fila concreta de la clinica A es invisible desde la B',
     async ({ tabla, fila }) => {
       if (!fila) return // horarios no lleva un id sembrado individual
+
+      // ---------------------------------------------------------------
+      // CONTROL POSITIVO. La fila tiene que EXISTIR antes de exigir que no
+      // se vea, y se comprueba con un rol DISTINTO del que se esta probando.
+      //
+      // Sin esta mitad, una lista vacia significa dos cosas a la vez: «la RLS
+      // la ha escondido» y «la fila ya no esta». Es el primero de los tres
+      // falsos verdes de `.claude/CLAUDE.md` —F1 §5.2, verde por ausencia,
+      // porque un test destructivo doce lineas mas arriba habia borrado la
+      // fila— y cualquier limpieza de otro archivo que se lleve el fixture
+      // por delante lo reproduce sin hacer ruido.
+      // ---------------------------------------------------------------
+      const { data: existe, error: errorExiste } = await clienteServicio()
+        .from(tabla)
+        .select('id')
+        .eq('id', fila(s))
+      expect(errorExiste).toBeNull()
+      expect(
+        existe ?? [],
+        `La fila de ${tabla} que esta prueba dice esconder NO EXISTE. Sin ella, el «no ` +
+          'se ve desde B» de abajo es verde por ausencia y no demuestra nada.',
+      ).toHaveLength(1)
 
       const otro = await clienteUsuario(USUARIOS.bPropietario.email, CONTRASENA)
       const { data, error } = await otro.from(tabla).select('id').eq('id', fila(s))

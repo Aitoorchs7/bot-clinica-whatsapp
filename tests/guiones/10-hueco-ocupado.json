@@ -1,0 +1,78 @@
+{
+  "nombre": "Hueco ocupado: la hora se agota y lo dice la base, no el modelo",
+  "porque": "Es el bug de V1 —se ofrecian huecos que la reserva luego rechazaba— y la garantia no es del modelo: es el constraint sin_solape. La clinica de prueba tiene DOS gabinetes, asi que la misma hora admite dos citas y la tercera no. Las dos primeras entran; la tercera vuelve con ocupado, que no es lo mismo que fuera_de_horario. Ninguna de las tres decisiones la toma el modelo.",
+  "turnos": [
+    {
+      "paciente": "Soy Iker Mena, 600111777, revision el {{DIA}}",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Iker" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Mena" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111777" } },
+            { "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }
+          ]
+        },
+        { "texto": "Tengo a las {{HORA_LOCAL}}. ¿Te la reservo?" }
+      ],
+      "espera": { "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Reservada a las {{HORA_LOCAL}}." }
+      ],
+      "espera": { "resultados": [{ "herramienta": "crear_cita", "ok": true }] }
+    },
+    {
+      "paciente": "Ponme otra a esa misma hora, las {{HORA_LOCAL}}, para Jon Mena",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Jon" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Mena" } },
+            { "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }
+          ]
+        },
+        { "texto": "Te confirmo: Jon Mena, revision, a las {{HORA_LOCAL}}. ¿Correcto?" }
+      ],
+      "espera": { "herramientas": ["anotar", "anotar", "anotar"] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Reservada tambien la de Jon a las {{HORA_LOCAL}}." }
+      ],
+      "espera": { "resultados": [{ "herramienta": "crear_cita", "ok": true }] }
+    },
+    {
+      "paciente": "Y una tercera a las {{HORA_LOCAL}} para Aitana Mena",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Aitana" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Mena" } },
+            { "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }
+          ]
+        },
+        { "texto": "Te confirmo: Aitana Mena, revision, a las {{HORA_LOCAL}}. ¿Correcto?" }
+      ],
+      "espera": { "herramientas": ["anotar", "anotar", "anotar"] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Esa hora ya esta cogida del todo. Te busco otra para Aitana." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": false, "motivo": "ocupado" }],
+        "respuestaNoContiene": ["cerrada"]
+      }
+    }
+  ],
+  "alFinal": { "citas": 2, "escalados": 0 }
+}

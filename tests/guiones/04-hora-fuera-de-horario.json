@@ -1,0 +1,35 @@
+{
+  "nombre": "Hora fuera de horario: piden las tres de la madrugada",
+  "porque": "El bloque 30 prohibe expresamente confundir «esta cerrado» con «esta cogido»: es el fallo que V1 documenta. Aqui se comprueba que el RPC devuelve fuera_de_horario, NO ocupado, y que no se escribe ninguna cita.",
+  "turnos": [
+    {
+      "paciente": "Queria una revision. Me llamo Luis Soto, 600111444. ¿Puede ser el {{DIA}} a las tres de la mañana?",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Luis" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Soto" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111444" } },
+            { "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }
+          ]
+        },
+        { "texto": "Te confirmo: Luis Soto, revision, a las 03:00. ¿Te la reservo?" }
+      ],
+      "espera": { "herramientas": ["anotar", "anotar", "anotar", "anotar"] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{DIA}}T01:00:00.000Z" } }] },
+        { "texto": "A esa hora la clinica esta cerrada. Abrimos de nueve a dos y de tres y media a ocho: dime otra y te la busco." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": false, "motivo": "fuera_de_horario" }],
+        "respuestaContiene": ["cerrada"],
+        "respuestaNoContiene": ["cogida", "ocupada"]
+      }
+    }
+  ],
+  "alFinal": { "citas": 0, "escalados": 0 }
+}

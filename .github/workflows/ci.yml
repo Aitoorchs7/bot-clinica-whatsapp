@@ -5,23 +5,54 @@
 # estatica de los tests de RLS "bloquea el merge en CI" cuando no habia ningun
 # CI. O se monta, o se borra la frase; se monta.
 #
-# Dos trabajos, y la diferencia importa:
+# TRES trabajos, y la diferencia importa:
 #
-#   comprobaciones-estaticas · Corre siempre, sin credenciales. Lee los .sql de
-#     supabase/migrations y comprueba que ninguna tabla se ha quedado sin RLS y
-#     sin politicas. Demuestra que las politicas estan ESCRITAS.
+#   comprobaciones-estaticas · Corre siempre, sin credenciales. Lint, tipos,
+#     compilacion y toda la mitad de la suite que no necesita base de datos.
+#     Lee los .sql de supabase/migrations y comprueba que ninguna tabla se ha
+#     quedado sin RLS y sin politicas. Demuestra que las politicas estan
+#     ESCRITAS.
 #
-#   rls-viva · Se conecta al proyecto de desarrollo como cada rol y comprueba,
-#     tabla por tabla, que ve y que no. Demuestra que la base de datos las tiene
-#     PUESTAS, que no es lo mismo.
+#   auditoria-de-fuga · La barandilla 4. Se conecta al proyecto de desarrollo
+#     y lanza las 30 preguntas adversarias contra datos sembrados con el
+#     marcador. NO llama a Gemini: el modelo que usa es peor que Gemini a
+#     proposito (ver tests/fuga/01-bateria.test.ts). Es el trabajo que tiene
+#     que bloquear el merge.
+#
+#   pruebas-vivas · El resto del nivel 2 y las de navegador: RLS tabla por
+#     tabla como cada rol, los guiones de conversacion, los trabajos
+#     programados y Playwright sobre el panel. Demuestra que la base de datos
+#     tiene las politicas PUESTAS, que no es lo mismo que escritas.
 #
 # El nombre del primero dice lo que cubre a proposito: un tick verde que ponga
 # "comprobaciones estaticas" no se confunde con una suite completa.
 #
-# PARA QUE ESTO BLOQUEE DE VERDAD hace falta un paso mas, y es en la web de
-# GitHub, no aqui: Settings > Branches > Add branch ruleset sobre `main`, con
-# "Require status checks to pass" y el check `comprobaciones-estaticas`
-# marcado. Sin eso este archivo informa, pero no impide nada.
+# -----------------------------------------------------------------------------
+# ⚠ LO QUE ESTE ARCHIVO NO PUEDE HACER, Y HAY QUE LEERLO ANTES DE FIARSE
+# -----------------------------------------------------------------------------
+# UN WORKFLOW NO BLOQUEA NADA POR SI SOLO. Para que `auditoria-de-fuga` impida
+# mezclar hace falta un ruleset de rama sobre `main` (Settings > Rules >
+# Rulesets, o Settings > Branches) con "Require status checks to pass" y el
+# check `auditoria-de-fuga` marcado.
+#
+# Y AHI ESTA EL PROBLEMA, MEDIDO EL 21/09/2026 CONTRA LA API DE GITHUB:
+#
+#     GET /repos/Aitoorchs7/bot-clinica-whatsapp/rulesets
+#     403 · "Upgrade to GitHub Pro or make this repository public to enable
+#            this feature."
+#
+# El repositorio es PRIVADO en un plan gratuito, y ahi GitHub no ofrece ni
+# rulesets ni proteccion de rama. O sea: hoy NADA impide mezclar a `main`, y
+# no es porque falte marcar una casilla, es porque la casilla no existe.
+#
+# Las tres salidas, y ninguna se puede tomar desde aqui:
+#   1 · Hacer publico el repositorio  -> rulesets gratis.
+#   2 · GitHub Pro / Team             -> rulesets en privado.
+#   3 · Dejarlo asi                   -> entonces esta frase se queda escrita
+#                                        y nadie dice que el merge esta
+#                                        bloqueado, porque no lo esta.
+#
+# Ver ESTADO_F7 §6. Mientras siga el caso 3, este archivo INFORMA. No impide.
 # =============================================================================
 name: CI
 
@@ -77,13 +108,77 @@ jobs:
       - name: Compilacion
         run: pnpm build
 
-  rls-viva:
-    name: rls-viva
+  # ---------------------------------------------------------------------------
+  # LA BARANDILLA 4
+  # ---------------------------------------------------------------------------
+  # Este trabajo NO lleva `if:`. Es deliberado y es la diferencia entre lo que
+  # habia antes y lo que hay ahora.
+  #
+  # `pruebas-vivas` se puede apagar con una variable de repositorio porque
+  # necesita credenciales que no todo el mundo tiene. La auditoria de fuga no:
+  # un trabajo de seguridad que se apaga solo cuando falta el entorno es un
+  # tick verde que no ha mirado nada, y es el fallo que este proyecto ya ha
+  # cometido tres veces.
+  #
+  # `FUGA_EXIGIDA=1` es lo que lo garantiza por dentro: con esa variable, si
+  # falta Supabase, la bateria se pone ROJA en vez de saltarse (ver
+  # tests/ayuda/entorno.ts). Sin secretos configurados este trabajo falla, y
+  # eso es lo correcto: «no he podido comprobarlo» no se informa igual que
+  # «esta todo bien».
+  # ---------------------------------------------------------------------------
+  auditoria-de-fuga:
+    name: auditoria-de-fuga
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # El proyecto tiene que ser el de DESARROLLO. Ver la nota de
+      # `pruebas-vivas`, mas abajo: el primer cerrojo es no poner aqui el
+      # secreto de produccion.
+      - name: Preparar el entorno
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL_DEV }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY_DEV }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
+          EOF
+
+      - name: Las 30 preguntas adversarias
+        env:
+          FUGA_EXIGIDA: '1'
+        run: pnpm vitest run tests/fuga tests/barandillas
+
+      - name: Borrar el entorno
+        if: always()
+        run: rm -f .env.local
+
+  # ---------------------------------------------------------------------------
+  pruebas-vivas:
+    name: pruebas-vivas
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Se activa poniendo la variable de repositorio RLS_VIVA a "true" y los
     # cuatro secretos de abajo. Sin eso no corre: mas vale un trabajo ausente
     # que uno verde por no haber comprobado nada.
+    #
+    # Corre DESPUES de la auditoria de fuga y no a la vez: las dos siembran y
+    # limpian el mismo fixture del proyecto de desarrollo, y dos tiradas a la
+    # vez se pisan (ESTADO_F3 §5.4, ampliado en F5 a Playwright). Dos trabajos
+    # concurrentes contra la misma base reproducen exactamente el falso verde
+    # de F6: la limpieza de uno deja al otro sin las filas que dice comprobar.
+    needs: auditoria-de-fuga
     if: vars.RLS_VIVA == 'true'
 
     steps:
@@ -98,11 +193,11 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # El proyecto tiene que ser el de DESARROLLO. La siembra crea cuatro
-      # usuarios con una contrasena que esta escrita en el repositorio y, al
-      # limpiar, borra clinicas en cascada. `exigirBaseDeDesarrollo` se niega a
-      # sembrar si encuentra pacientes o citas que no sean de las clinicas de
-      # prueba, pero el primer cerrojo es no poner aqui el secreto de produccion.
+      # La siembra crea cuatro usuarios con una contrasena que esta escrita en
+      # el repositorio y, al limpiar, borra clinicas en cascada.
+      # `exigirBaseDeDesarrollo` se niega a sembrar si encuentra pacientes o
+      # citas que no sean de las clinicas de prueba, pero el primer cerrojo es
+      # no poner aqui el secreto de produccion.
       - name: Preparar el entorno
         run: |
           cat > .env.local <<'EOF'
@@ -115,8 +210,25 @@ jobs:
       - name: Tipos de las rutas
         run: pnpm exec next typegen
 
-      - name: Pruebas de RLS contra la base de datos
+      - name: Toda la suite contra la base de datos
         run: pnpm vitest run
+
+      # Playwright entra en CI en F7. No se habia añadido antes a proposito
+      # (ESTADO_F5, «Infraestructura» punto 3): un paso de CI que nadie ha
+      # visto correr es otra forma de creerse cubierto. Aqui ya se ha visto.
+      - name: Navegador
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Pruebas de navegador
+        run: pnpm test:e2e
+
+      - name: Trazas de lo que fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trazas
+          path: test-results/
+          retention-days: 7
 
       - name: Borrar el entorno
         if: always()

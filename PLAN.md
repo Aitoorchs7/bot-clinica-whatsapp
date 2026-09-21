@@ -117,8 +117,12 @@ recordarlos. *(Citado en `src/lib/bot/gemini.ts` y en
    sembrados con un marcador único. Si el marcador aparece en cualquier
    respuesta o en el prompt montado, la prueba bloquea el merge.
 
-⚠️ La barandilla 4 hay que pasarla **con el modelo que corre de verdad**. Nunca
-se ha ejecutado contra Gemini. Es F7 y sigue pendiente.
+⚠️ **Ejecutada contra Gemini de verdad el 21/09/2026** (F7). Resultado: cero
+fugas y cero `AssertionError` en las treinta. Las dieciseis que fallaron se
+cayeron por infraestructura —ocho por cuota, una por un 503, y una por el fallo
+del `thought_signature`—, ninguna por decir lo que no debia. El limite del tier
+gratuito son **20 peticiones al dia por modelo**, asi que esa mitad se corre a
+trozos y **la que bloquea el merge es la determinista**. Ver `ESTADO_F7` §5.
 
 ---
 
@@ -231,7 +235,7 @@ solo a todo archivo que use el cliente del bot.
 | **F4** | El canal de WhatsApp: webhook, envío, plantillas, audio, debounce | ✅ Cerrada |
 | **F5** | El panel de la clínica | ✅ Cerrada |
 | **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ✅ Cerrada |
-| **F7** | La barandilla 4 con el modelo real | ▶ Siguiente |
+| **F7** | La suite de conjunto: barandilla 4, quince guiones y CI | ✅ Cerrada |
 | **F8** | `alta-clinica` y la entrega al cliente | ⏳ |
 
 ### F1 · Base de datos y RLS
@@ -330,9 +334,23 @@ error aquí le llega a un paciente que no ha pedido nada.
 
 La migración **009** es de aquí, es la única que F6 añadió, y **solo añade**.
 
-### F7 · La barandilla 4
+### F7 · La suite de conjunto
 
-Las 30 preguntas adversarias, contra el modelo que corre de verdad.
+Las 30 preguntas adversarias, quince guiones de conversacion de referencia, el
+hueco de RLS que dejo F6 (`recordatorios`) y un CI de tres trabajos.
+
+**La barandilla 4 tiene dos mitades, y la que bloquea no llama a Gemini.** El
+modelo de `tests/fuga/01-bateria.test.ts` es el PEOR posible: vuelca
+literalmente todo lo que ve. Contra el, el marcador solo puede faltar porque
+nunca entro — que es la garantia que vende el producto, y no la prudencia del
+modelo. La mitad con Gemini de verdad esta en `02-con-gemini.test.ts`, ya se ha
+ejecutado (ninguna fuga en treinta) y **no cabe entera en un dia**: el tier
+gratuito da 20 peticiones diarias por modelo. Ver `ESTADO_F7` §3.1 y §5.
+
+**Y encontro tres fallos que no son suyos**, los tres en §8 de abajo: el bucle
+de herramientas devuelve 400 contra `gemini-3.6-flash` por el
+`thought_signature`, el canal no le pasa al motor ni el borrador ni las rondas
+de aclaracion, y un clic del interruptor deja dos apuntes en `auditoria`.
 
 ### F8 · Alta de clínica y entrega
 
@@ -488,24 +506,60 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
   `citas` **NO** se toca: `consultar_huecos` necesita ver las ajenas para
   calcular disponibilidad, y estrecharla reintroduciría el bug de V1 por una
   puerta nueva.
-- **F7**, la barandilla 4 con el modelo real.
 - ~~**Los botones de `recordatorio_cita`** no tienen quien los atienda.~~
   ✅ **Cerrado en F6.** `CONFIRMAR:<id>` confirma la cita —comprobando que es de
   esa clínica (RLS) y de ese paciente (teléfono)— y `CANCELAR:<id>` **no
   cancela**: escala a recepción y le dice al paciente que su cita sigue en pie.
   Cancelar por WhatsApp está fuera del producto. Ver `ESTADO_F6 §3.2` y §3.3.
 
+### Nuevo en F7 · Tres fallos que encontro la suite, y el merge que no bloquea
+
+> Copia de `ESTADO_F7` §8. **Si se toca una, se toca la otra.**
+
+1. **🔴 Confirmar contra Gemini el arreglo del `thought_signature`.**
+   El fallo: el bucle devolvia `400 INVALID_ARGUMENT` contra
+   `gemini-3.6-flash` en la SEGUNDA vuelta porque `gemini.ts` no arrastraba el
+   `thoughtSignature` que Gemini 3 pone en cada `functionCall`. Vivia al lado
+   del `functionCall`, en la Part, y `respuesta.functionCalls` —el atajo del
+   SDK— lo tiraba. No lo cazaba nadie porque `bot-contrato` hacia todas sus
+   llamadas de UNA vuelta.
+   **✅ Arreglado en F7**, con contrato y con cinco pruebas vistas en rojo
+   (`tests/bot/06-firma-de-pensamiento.test.ts`).
+   **⚠️ PERO NADIE HA VISTO A GEMINI ACEPTARLO:** la cuota diaria (20) se
+   agoto con la bateria de fuga y los cuatro intentos se fueron en 429 y 503.
+   Un comando, dos peticiones, lo primero que haya cuota:
+   `GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas`
+2. **🔴 El merge NO esta bloqueado, y no es una casilla sin marcar.** El
+   repositorio es privado en plan gratuito y ahi GitHub no ofrece rulesets ni
+   proteccion de rama: `GET /rulesets` devuelve `403 · "Upgrade to GitHub Pro
+   or make this repository public"`. O publico, o de pago, o se borra la frase
+   «bloquea el merge» de donde este. Decision de producto. Ver `ESTADO_F7` §6.1.
+3. **🟠 El canal no le pasa al motor `borrador` ni `rondasDeAclaracion`.**
+   `procesar.ts` llama a `responder()` sin las dos. El borrador no sobrevive
+   entre mensajes y `RONDAS_MAXIMAS` no se aplica nunca, asi que «una sola
+   ronda de aclaracion, nunca bucles» no esta garantizado de punta a punta.
+4. **🟡 Un clic del interruptor deja DOS apuntes en `auditoria`.**
+   `tests/e2e/04-interruptor.spec.ts:189` lo caza. Los dos con `antes: true`,
+   a 2,1 s: apunta a dos envios concurrentes de la accion. **Es anterior a F7**
+   —comprobado con todo el trabajo de la fase en `git stash`— y no es clock
+   skew, que se midio.
+5. **La cuota de Gemini son 20 peticiones al DIA por modelo.** Si la primera
+   clinica sale a produccion con esta clave, eso no es un limite de pruebas:
+   es un limite de producto.
+
 ### Infraestructura
 
-1. El CI no impide mezclar: falta marcar `comprobaciones-estaticas` como check
-   obligatorio en Settings → Branches.
+1. ~~El CI no impide mezclar: falta marcar el check obligatorio.~~
+   ⚠️ **Reabierto y agravado en F7.** No falta marcarlo: en un repositorio
+   privado con plan gratuito **no se puede marcar**. Ver el punto 2 de arriba.
 2. La mitad viva no corre en CI: faltan `RLS_VIVA=true` y los cuatro secretos
-   `SUPABASE_*_DEV`.
-3. **Las pruebas de navegador tampoco corren en CI.** *(Nuevo en F5.)* Cuando se
-   resuelva el punto 2, el trabajo `rls-viva` puede llevarlas con dos pasos más:
-   `pnpm exec playwright install --with-deps chromium` y `pnpm test:e2e`. No se
-   han añadido a ciegas: un paso de CI que nadie ha visto correr es otra forma
-   de creerse cubierto.
+   `SUPABASE_*_DEV`. **Y no hay ninguno configurado**: `actions/secrets` y
+   `actions/variables` vuelven vacíos. La última ejecución de CI es del
+   16/09/2026 y es de F1 — F2 a F6 se cerraron sin que el CI corriera.
+3. ~~**Las pruebas de navegador tampoco corren en CI.**~~ ✅ **Cerrado en F7.**
+   `pruebas-vivas` las lleva, con `playwright install --with-deps chromium`,
+   `pnpm test:e2e` y subida de trazas al fallar. No se añadieron a ciegas: se
+   han visto correr (30 de 31, con el fallo del punto 4 de arriba).
 4. **El horario del cron depende del plan de Vercel.** *(Nuevo en F6.)*
    `vercel.json` dispara `/api/cron/recordatorios` **cada hora**, y hay planes
    que solo admiten crons diarios. Si se publica en uno de esos hay que cambiar

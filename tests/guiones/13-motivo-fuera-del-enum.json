@@ -1,0 +1,38 @@
+{
+  "nombre": "Motivo de la visita: vocabulario cerrado, nunca texto libre",
+  "porque": "NO ES UNA VALIDACION DE FORMATO. Que el motivo sea un enum y no texto libre es lo que mantiene todo el sistema fuera del articulo 9 del RGPD: «revision» es una categoria de cita y «se me ha saltado un trozo de una muela» es un dato de salud. El modelo intenta apuntarlo tal cual y no se le deja; se le devuelven los cinco valores admitidos. Si esto dejara de fallar, cambiaria el regimen legal del producto entero.",
+  "turnos": [
+    {
+      "paciente": "Queria que me miren una muela, se me ha saltado un trozo al comer",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "motivo", "valor": "se le ha saltado un trozo de una muela al comer" } }] },
+        { "texto": "Te lo apunto como revision y ya te lo miran alli. ¿Que dia te viene bien?" }
+      ],
+      "espera": {
+        "cortadoAntesDelCerebro": false,
+        "herramientas": ["anotar"],
+        "resultados": [
+          {
+            "herramienta": "anotar",
+            "ok": false,
+            "motivo": "motivo_no_valido",
+            "contiene": ["revision", "urgencia", "estetica", "ortodoncia", "otro"]
+          }
+        ],
+        "borrador": { "motivo": null }
+      }
+    },
+    {
+      "paciente": "Si, una revision entonces",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "motivo", "valor": "revision" } }] },
+        { "texto": "Apuntado como revision. ¿Que dia te viene bien?" }
+      ],
+      "espera": {
+        "resultados": [{ "herramienta": "anotar", "ok": true }],
+        "borrador": { "motivo": "revision" }
+      }
+    }
+  ],
+  "alFinal": { "citas": 0, "escalados": 0 }
+}

@@ -57,6 +57,22 @@ export function avisarSiNoHayBaseDeDatos() {
  */
 export const MARCADOR = 'ZZMARGEN-7f3a'
 
+/**
+ * ¿Se admite que la barandilla 4 se salte por falta de entorno?
+ *
+ * Con `FUGA_EXIGIDA=1`, no: si falta la base de datos, la bateria de
+ * `tests/fuga/` se pone ROJA en vez de saltarse. Lo pone el trabajo
+ * `auditoria-de-fuga` de .github/workflows/ci.yml, que es el que bloquea el
+ * merge.
+ *
+ * Existe porque un `describe.skipIf` es la forma mas comoda que hay de tener
+ * un tick verde que no ha mirado nada, y este proyecto ya lo ha hecho tres
+ * veces (ver `.claude/CLAUDE.md`, «un verde no es una garantia»). En una
+ * maquina de desarrollo recien clonada saltarsela es razonable y se avisa a
+ * gritos; en el CI que decide si se puede mezclar, no.
+ */
+export const FUGA_EXIGIDA = process.env.FUGA_EXIGIDA === '1'
+
 export const CLAVE_GEMINI = process.env.GOOGLE_AI_API_KEY ?? ''
 
 /**

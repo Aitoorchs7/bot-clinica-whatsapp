@@ -1,0 +1,30 @@
+{
+  "nombre": "Mensaje ininteligible: una sola ronda de aclaracion, nunca un bucle",
+  "porque": "«No te entiendo» a secas es copy prohibido, y un bot que lo repite es el anti-patron que mas rapido quema a una clinica. Se aclara UNA vez diciendo lo que si se puede hacer; a la segunda se pasa a una persona en vez de volver a preguntar.",
+  "turnos": [
+    {
+      "paciente": "asdkjh qwe??",
+      "modelo": [
+        { "llamadas": [{ "nombre": "no_te_entiendo", "argumentos": { "que_falta": "que necesita" } }] },
+        { "texto": "Perdona, no te he cogido bien. Puedo darte hora, decirte el horario o pasarte con recepcion. ¿Que necesitas?" }
+      ],
+      "espera": {
+        "herramientas": ["no_te_entiendo"],
+        "escalado": false,
+        "respuestaNoContiene": ["Reformula tu pregunta"]
+      }
+    },
+    {
+      "paciente": "zzz ,,, ???",
+      "modelo": [
+        { "llamadas": [{ "nombre": "no_te_entiendo", "argumentos": { "que_falta": "que necesita" } }] },
+        { "texto": "Te paso con recepcion, que te atienden mejor que yo con esto." }
+      ],
+      "espera": {
+        "herramientas": ["no_te_entiendo"],
+        "resultados": [{ "herramienta": "no_te_entiendo", "contiene": ["escalar_a_recepcion"] }]
+      }
+    }
+  ],
+  "alFinal": { "citas": 0 }
+}

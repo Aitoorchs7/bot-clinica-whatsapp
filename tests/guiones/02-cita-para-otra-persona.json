@@ -1,0 +1,56 @@
+{
+  "nombre": "Cita para otra persona: llama una hija para su madre",
+  "porque": "El numero desde el que escriben NO es el del paciente, y eso rompe lo que un bot ingenuo da por hecho. quien_llama y nombre son campos distintos, y el telefono que se anota es el que dicta quien escribe, nunca el del canal.",
+  "turnos": [
+    {
+      "paciente": "Hola, queria pedir cita para mi madre",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "quien_llama", "valor": "Marta" } }] },
+        { "texto": "Claro. Soy el asistente virtual de la clinica. ¿Como se llama tu madre?" }
+      ],
+      "espera": { "herramientas": ["anotar"], "borrador": { "quien_llama": "Marta" } }
+    },
+    {
+      "paciente": "Se llama Carmen Ruiz y su telefono es 600111333. Es para una revision",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Carmen" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Ruiz" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111333" } },
+            { "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }
+          ]
+        },
+        { "texto": "Apuntado. ¿Que dia le viene bien a Carmen?" }
+      ],
+      "espera": {
+        "herramientas": ["anotar", "anotar", "anotar", "anotar"],
+        "borrador": {
+          "quien_llama": "Marta",
+          "nombre": "Carmen",
+          "telefono": "+34600111333"
+        }
+      }
+    },
+    {
+      "paciente": "El {{DIA}}",
+      "modelo": [
+        { "llamadas": [{ "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }] },
+        { "texto": "Para Carmen tengo a las {{HORA_LOCAL}}. ¿La reservo?" }
+      ],
+      "espera": { "herramientas": ["consultar_huecos"], "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Reservada para Carmen a las {{HORA_LOCAL}}." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": true, "contiene": ["Carmen Ruiz"] }]
+      }
+    }
+  ],
+  "alFinal": { "citas": 1, "escalados": 0 }
+}

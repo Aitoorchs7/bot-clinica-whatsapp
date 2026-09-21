@@ -1,0 +1,59 @@
+{
+  "nombre": "Cita simple: una persona pide hora para una revision y la coge",
+  "porque": "Es el camino feliz y el producto entero. Comprueba el orden de las seis herramientas, que la hora sale de consultar_huecos y no del modelo, y que la cita no se escribe hasta que el paciente dice que si habiendo visto la hora.",
+  "turnos": [
+    {
+      "paciente": "Hola, queria pedir cita para una revision",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }] },
+        { "texto": "Buenas. Soy el asistente virtual de la clinica. Para darte hora necesito tu nombre y apellidos." }
+      ],
+      "espera": {
+        "herramientas": ["anotar"],
+        "cortadoAntesDelCerebro": false,
+        "borrador": { "tratamiento_nombre": "Revision" }
+      }
+    },
+    {
+      "paciente": "Me llamo Ana Perez y mi telefono es 610224571",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Ana" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Perez" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "610224571" } }
+          ]
+        },
+        { "texto": "Gracias Ana. ¿Que dia te viene bien?" }
+      ],
+      "espera": {
+        "herramientas": ["anotar", "anotar", "anotar"],
+        "borrador": { "nombre": "Ana", "apellidos": "Perez", "telefono": "+34610224571" }
+      }
+    },
+    {
+      "paciente": "El {{DIA}} por la mañana",
+      "modelo": [
+        { "llamadas": [{ "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}", "franja": "manana" } }] },
+        { "texto": "Tengo libre a las {{HORA_LOCAL}}. ¿Te la reservo?" }
+      ],
+      "espera": {
+        "herramientas": ["consultar_huecos"],
+        "resultados": [{ "herramienta": "consultar_huecos", "ok": true }],
+        "respuestaNoContiene": ["huecos libres"]
+      }
+    },
+    {
+      "paciente": "Si, perfecto",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Hecho, Ana. Te espero el dia acordado a las {{HORA_LOCAL}}." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": true }]
+      }
+    }
+  ],
+  "alFinal": { "citas": 1, "escalados": 0 }
+}
