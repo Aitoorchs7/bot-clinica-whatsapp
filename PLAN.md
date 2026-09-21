@@ -534,10 +534,22 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    proteccion de rama: `GET /rulesets` devuelve `403 · "Upgrade to GitHub Pro
    or make this repository public"`. O publico, o de pago, o se borra la frase
    «bloquea el merge» de donde este. Decision de producto. Ver `ESTADO_F7` §6.1.
-3. **🟠 El canal no le pasa al motor `borrador` ni `rondasDeAclaracion`.**
-   `procesar.ts` llama a `responder()` sin las dos. El borrador no sobrevive
-   entre mensajes y `RONDAS_MAXIMAS` no se aplica nunca, asi que «una sola
-   ronda de aclaracion, nunca bucles» no esta garantizado de punta a punta.
+3. **🔴 El canal no le pasa al motor `borrador` ni `rondasDeAclaracion`, y
+   por eso NO SE COGEN CITAS.** `procesar.ts:308` llama a `responder()` sin las
+   dos. Medido con la convencion exacta del canal
+   (`tests/guiones/01-como-llama-el-canal.test.ts`): una cita pedida en cuatro
+   mensajes devuelve `faltan_datos` y deja CERO filas.
+   Y no vale «que el modelo vuelva a anotar»: el bloque 50 se lo PROHIBE
+   —«nunca anotes algo que el paciente no acabe de decir»—, asi que el modelo
+   que obedece no reserva y el que reserva desobedece. El prompt y el canal se
+   contradicen.
+   El arreglo necesita un sitio donde viva el borrador entre mensajes: una
+   migracion que SOLO AÑADE `borrador jsonb` y `rondas_aclaracion smallint` a
+   `conversaciones`. Comprobado que no toca ninguna politica
+   (`conversaciones_bot_update` no lleva lista de columnas, y no hay grants por
+   columna), y `conversaciones` si la purga el job de los 90 dias. Pendiente de
+   la confirmacion explicita que exige `.claude/CLAUDE.md` para tocar
+   `supabase/migrations/`.
 4. **🟡 Un clic del interruptor deja DOS apuntes en `auditoria`.**
    `tests/e2e/04-interruptor.spec.ts:189` lo caza. Los dos con `antes: true`,
    a 2,1 s: apunta a dos envios concurrentes de la accion. **Es anterior a F7**
@@ -553,9 +565,13 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    ⚠️ **Reabierto y agravado en F7.** No falta marcarlo: en un repositorio
    privado con plan gratuito **no se puede marcar**. Ver el punto 2 de arriba.
 2. La mitad viva no corre en CI: faltan `RLS_VIVA=true` y los cuatro secretos
-   `SUPABASE_*_DEV`. **Y no hay ninguno configurado**: `actions/secrets` y
-   `actions/variables` vuelven vacíos. La última ejecución de CI es del
-   16/09/2026 y es de F1 — F2 a F6 se cerraron sin que el CI corriera.
+   `SUPABASE_*_DEV`. **No hay ninguno configurado**, así que `auditoria-de-fuga`
+   se pone roja — que es su diseño: no puede comprobar, luego no dice que todo
+   esté bien.
+   ✅ **F2 a F6 ya están empujados y el CI ha corrido**: `comprobaciones-estaticas`
+   en verde (562 pasadas, `tsc`, `eslint` y `next build`), el primero desde F1.
+   De paso cazó que la suite se ponía **roja por no tener entorno** en un clon
+   nuevo, arreglado en el mismo empujón. Ver `ESTADO_F7` §7.4.
 3. ~~**Las pruebas de navegador tampoco corren en CI.**~~ ✅ **Cerrado en F7.**
    `pruebas-vivas` las lleva, con `playwright install --with-deps chromium`,
    `pnpm test:e2e` y subida de trazas al fallar. No se añadieron a ciegas: se

@@ -55,6 +55,9 @@ rojo rompiéndola a propósito.
 - `tests/e2e/04-interruptor.spec.ts:189` falla, **y ya fallaba antes de esta
   fase**: comprobado con todo F7 guardado en `git stash` (§4.3).
 - El CI **no impide mezclar**, y en este repositorio no puede (§6).
+- Al correr el CI de verdad salió un cuarto fallo, y de los caros: la suite se
+  ponía **roja por no tener entorno** en una máquina recién clonada. Arreglado
+  y medido en §7.4.
 
 ---
 
@@ -380,7 +383,11 @@ Se decidió arreglarlo dentro de esta fase. El contrato, y lo que salió:
   correr `GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas`
   mañana, con cuota, antes de dar el fallo por cerrado.
 
-### 4.2 · 🟠 El canal no le pasa al motor ni el borrador ni las rondas
+### 4.2 · 🔴 El canal no le pasa al motor ni el borrador ni las rondas
+
+> **Subido de 🟠 a 🔴 el 21/09/2026, después de medirlo.** Se informó primero
+> como «el borrador no sobrevive entre mensajes», que suena a degradación. Lo
+> medido es peor: **una cita pedida en cuatro mensajes no se llega a coger.**
 
 `src/lib/whatsapp/procesar.ts` llama a `responder()` **sin** `borrador` ni
 `rondasDeAclaracion` (comprobado con `grep`: no aparecen en todo
@@ -396,6 +403,44 @@ Se decidió arreglarlo dentro de esta fase. El contrato, y lo que salió:
 El motor admite las dos cosas; es el canal el que no se las pasa. El motor de
 los guiones **sí** las enhebra, y lo dice en un comentario para que nadie
 confunda lo que mide el guion con lo que hace el canal.
+
+#### Lo medido, no lo razonado: `tests/guiones/01-como-llama-el-canal.test.ts`
+
+Es `01-cita-simple.json` —el camino feliz, cuatro mensajes— llamado **con la
+convención exacta de `procesar.ts:308`**: con `historial`, sin `borrador`, sin
+`rondasDeAclaracion`. Lo único que cambia respecto a los quince guiones. El
+resultado:
+
+```
+crear_cita -> {"ok":false,"motivo":"faltan_datos",
+               "porque":"todavia falta el nombre, los apellidos, un telefono,
+                         el tratamiento"}
+citas creadas en la conversacion: 0
+```
+
+**No se coge la cita.** Y el caso de uso principal del producto es coger citas.
+
+#### Y no vale decir «que el modelo vuelva a anotar»: el prompt se lo prohíbe
+
+Bloque 50, literal:
+
+> «Cada vez que el paciente te dé uno, llama a `anotar` con ese dato, y solo
+> con ese. **Nunca anotes algo que el paciente no acabe de decir.**»
+
+Un paciente que dijo su nombre hace tres mensajes no lo «acaba de decir» cuando
+escribe «sí». El modelo que **obedece** sus instrucciones no vuelve a anotar,
+el borrador llega vacío a `crear_cita` y la reserva no se escribe. El único
+modelo que cerraría la cita es uno que desobedezca el prompt — y eso no es una
+garantía, es una lotería. El prompt y el canal se contradicen, y gana el canal.
+
+Así que son **dos** defectos independientes encontrados por F7 que bloquean el
+caso de uso principal: éste y el `thought_signature` de §4.1.
+
+#### La prueba es de caracterización, y tiene fecha de caducidad
+
+Deja medido lo que pasa HOY para que el arreglo tenga contra qué compararse.
+**El día que `procesar.ts` enhebre el borrador, esa prueba se pondrá roja**:
+entonces hay que **borrarla**, no arreglarla. Lo dice su propia cabecera.
 
 ### 4.3 · 🟡 `04-interruptor.spec.ts:189` falla, y no es de esta fase
 
@@ -569,21 +614,20 @@ $ pnpm exec tsc --noEmit
 ### 7.2 · La suite, dos veces seguidas
 
 ```
- Test Files  42 passed | 4 skipped (46)
-      Tests  986 passed | 36 skipped (1022)
-   Duration  199.26s
+ Test Files  43 passed | 3 skipped (46)
+      Tests  988 passed | 36 skipped (1024)
 
- Test Files  42 passed | 4 skipped (46)
-      Tests  986 passed | 36 skipped (1022)
-   Duration  197.10s
+ Test Files  43 passed | 3 skipped (46)
+      Tests  988 passed | 36 skipped (1024)
 
 $ diff <(grep -E "Test Files|Tests " f7-1.txt) <(grep -E "Test Files|Tests " f7-2.txt)
 IDENTICO
 ```
 
-**El mismo número dos veces seguidas.** De 829 a **986**: +157 pruebas (130 de
-la batería de fuga, 17 de los guiones, 5 de la firma de pensamiento, 4 del
-barrido de RLS con `recordatorios`, y el resto los controles positivos). Los 36
+**El mismo número dos veces seguidas.** De 829 a **988**: +159 pruebas (130 de
+la batería de fuga, 17 de los guiones, 5 de la firma de pensamiento, 2 de la
+caracterización del canal, 4 del barrido de RLS con `recordatorios`, y el resto
+los controles positivos). Los 36
 saltados son los de contrato y los 30 de la fuga con Gemini, que se piden a
 mano — y hoy, además, no tienen cuota.
 
@@ -597,6 +641,71 @@ $ pnpm test:e2e
 ```
 
 **Se informa el rojo, no se esconde.** Es §4.3, y es anterior a esta fase.
+
+### 7.4 · El CI, corrido de verdad. Y lo que encontró
+
+No se dio por bueno en local. Se empujó la rama —**F2 a F6 nunca se habían
+empujado, por eso el CI llevaba sin correr desde el 16/09**— y se miró el
+pipeline.
+
+**Primera ejecución (`35613568067`): las dos rojas.** Una esperada y otra no.
+
+`auditoria-de-fuga` falló, **y falló bien**, que era el objetivo del diseño:
+
+```
+FUGA_EXIGIDA: 1
+❯ tests/fuga/01-bateria.test.ts (130 tests | 1 failed | 127 skipped)
+  × con FUGA_EXIGIDA=1 no se admite saltarsela por falta de entorno
+AssertionError: FUGA_EXIGIDA=1 y no hay Supabase de desarrollo. La barandilla 4
+NO se ha comprobado, y eso no es un verde: revisa los secretos del trabajo de CI.
+```
+
+El cerrojo funciona **en el pipeline**, no sólo en mi cabeza: sin secretos, la
+barandilla 4 se niega a informar verde. Faltan los cuatro `SUPABASE_*_DEV`.
+
+#### 🔴 Y la que no se esperaba: la suite se ponía roja por NO TENER ENTORNO
+
+```
+FAIL tests/panel-vivo/01-roles-y-aislamiento.test.ts
+Error: supabaseUrl is required.
+ ❯ clienteServicio tests/ayuda/clientes.ts:22:10
+ ❯ tests/panel-vivo/01-roles-y-aislamiento.test.ts:38:18
+ Test Files  1 failed | 27 passed | 17 skipped (45)
+```
+
+`clienteServicio()` se llamaba **al nivel del módulo**. Sin credenciales,
+`createClient` **lanza**, y eso revienta la **recolección** del archivo entero,
+antes de que `describeVivo` tenga ocasión de saltárselo.
+
+O sea: en una máquina recién clonada `pnpm vitest run` salía en rojo. Lo
+contrario de lo que hace el resto del nivel 2 —saltarse y avisar a gritos— y lo
+contrario de lo que promete ESTADO_F3 §1 del nivel 1: «corre en una máquina
+recién clonada». **No corría.**
+
+Nadie lo vio en cinco fases porque todos teníamos `.env.local` y el CI llevaba
+sin correr desde F1. Es literalmente lo que «funciona en mi máquina» no
+sustituye, y es el motivo por el que esta sección existe.
+
+Arreglado con un cliente perezoso, y medido apartando `.env.local` y
+devolviéndolo en la misma orden:
+
+```
+antes:    1 failed | 27 passed | 17 skipped   exit 1
+después:  562 passed | 462 skipped (1024)     exit 0
+```
+
+**Segunda ejecución (`35614082047`), con el arreglo:**
+
+| Trabajo | Resultado | |
+|---|---|---|
+| `comprobaciones-estaticas` | ✅ **success** | lint, `next typegen`, `tsc`, **562 pasadas / 460 saltadas (1022)** y `next build` |
+| `auditoria-de-fuga` | ❌ failure | sin secretos. Es el diseño: no puede comprobar, así que no dice que todo está bien |
+| `pruebas-vivas` | ⏭ skipped | falta `RLS_VIVA=true` |
+
+**Es el primer verde de `comprobaciones-estaticas` desde F1, y el primero que
+cubre F2 a F7.** Los 460 saltados de ese trabajo son la mitad viva: sin
+secretos no se puede decir que la RLS esté puesta, sólo que está escrita — que
+es exactamente lo que el nombre del trabajo promete y nada más.
 
 ---
 
@@ -616,7 +725,16 @@ $ pnpm test:e2e
    producción que nadie haya comprobado.** Es lo primero de mañana.
 2. **🔴 El merge no está bloqueado (§6.1).** Decisión de producto, no de
    código: público, de pago, o se borra la frase.
-3. **🟠 El canal no pasa `borrador` ni `rondasDeAclaracion` (§4.2).**
+3. **🔴 El canal no pasa `borrador` ni `rondasDeAclaracion` (§4.2).** Medido:
+   una cita en cuatro mensajes devuelve `faltan_datos` y deja CERO filas. El
+   arreglo necesita un sitio donde viva el borrador entre mensajes, y eso es
+   una migración que **sólo añade** dos columnas a `conversaciones`
+   (`borrador jsonb`, `rondas_aclaracion smallint`). Comprobado que no hace
+   falta tocar ninguna política: `conversaciones_bot_update` no lleva lista de
+   columnas y no hay `grant` por columna en ninguna migración. `conversaciones`
+   además **sí** la purga el job de los 90 días, que es donde debe vivir un
+   dato a medias. **Pendiente de la confirmación explícita que pide
+   `.claude/CLAUDE.md` para tocar `supabase/migrations/`.**
 4. **🟡 `04-interruptor.spec.ts:189` (§4.3).** Dos apuntes de `auditoria` por
    un clic.
 5. **El CI no ha corrido desde el 16/09.** Faltan los cuatro secretos
