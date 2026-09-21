@@ -35,11 +35,25 @@ import { clienteBot, clienteServicio, clienteUsuario } from '../ayuda/clientes'
 import { CONTRASENA, USUARIOS } from '../ayuda/siembra'
 import { describeVivo, sembrado } from '../ayuda/vivo'
 
-const servicio = clienteServicio()
+/**
+ * PEREZOSO A PROPOSITO, Y COSTO EL PRIMER CI QUE CORRIO DESDE F1.
+ *
+ * `clienteServicio()` construye el cliente de Supabase, y sin credenciales
+ * `createClient` LANZA («supabaseUrl is required»). Llamandolo al nivel del
+ * modulo, eso reventaba la RECOLECCION del archivo entero —antes de que
+ * `describeVivo` tuviera ocasion de saltarselo—, asi que en una maquina recien
+ * clonada, y en el CI, la suite se ponia ROJA por no tener entorno. Que es lo
+ * contrario de lo que hace el resto del nivel 2, que se salta y avisa.
+ *
+ * Nadie lo vio en cinco fases porque todo el mundo tenia .env.local y el CI
+ * llevaba sin correr desde F1. Ver ESTADO_F7 §7.4.
+ */
+let elServicio: ReturnType<typeof clienteServicio> | null = null
+const servicio = () => (elServicio ??= clienteServicio())
 
 /** La fila existe y vale lo que decimos, mirado con service_role. */
 async function exigirValor(tabla: string, id: string, columna: string, esperado: unknown) {
-  const { data, error } = await servicio.from(tabla).select(`id, ${columna}`).eq('id', id).single()
+  const { data, error } = await servicio().from(tabla).select(`id, ${columna}`).eq('id', id).single()
   expect(error, `No se ha podido leer ${tabla}#${id} con service_role`).toBeNull()
   expect(
     (data as Record<string, unknown> | null)?.[columna],
@@ -151,7 +165,7 @@ describeVivo('el rol lectura no escribe. Lo dice la base, no el panel', () => {
     onTestFinished(async () => {
       // Con service_role: la 004 revoca DELETE sobre `auditoria` a todo el
       // mundo, que es justo lo que hace que el rastro sirva de algo.
-      await servicio.from('auditoria').delete().eq('id', creado)
+      await servicio().from('auditoria').delete().eq('id', creado)
     })
   })
 
@@ -211,7 +225,7 @@ describeVivo('un usuario de la clinica A no ve NI UNA fila de la B', () => {
 
       // Primero: esa fila de B existe. Si no existiera, lo de abajo seria
       // verde por ausencia.
-      const deVerdad = await servicio.from(tabla).select('id').eq('id', idDeB)
+      const deVerdad = await servicio().from(tabla).select('id').eq('id', idDeB)
       expect(deVerdad.data, `La fila de B en ${tabla} no existe: el fixture esta roto`).toHaveLength(1)
 
       const propietarioA = await clienteUsuario(USUARIOS.aPropietario.email, CONTRASENA)
@@ -261,7 +275,7 @@ describeVivo('EL TOGGLE DE VERDAD: lo que se apaga aqui deja de llegar al bot', 
     // 2 · Recepcion la apaga. Esto es exactamente lo que hace el interruptor
     //     del panel: un update sobre `publico`, sin tocar nada mas.
     onTestFinished(async () => {
-      await servicio.from('faq').update({ publico: true }).eq('id', s.faqAPublica)
+      await servicio().from('faq').update({ publico: true }).eq('id', s.faqAPublica)
     })
 
     const { data, error } = await recepcion
