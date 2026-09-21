@@ -18,6 +18,8 @@
     "test:watch": "vitest",
     "tipos": "node scripts/generar-tipos.mjs",
     "bloques": "node scripts/sembrar-bloques.mjs",
+    "alta": "node scripts/alta-clinica.mjs",
+    "alta:comprobar": "node scripts/comprobar-alta.mjs",
     "test:panel": "vitest run tests/panel/",
     "test:panel-vivo": "vitest run tests/panel-vivo/",
     "test:trabajos": "vitest run tests/trabajos/ tests/cron/",

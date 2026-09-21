@@ -236,7 +236,7 @@ solo a todo archivo que use el cliente del bot.
 | **F5** | El panel de la clínica | ✅ Cerrada |
 | **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ✅ Cerrada |
 | **F7** | La suite de conjunto: barandilla 4, quince guiones y CI | ✅ Cerrada |
-| **F8** | `alta-clinica` y la entrega al cliente | ⏳ |
+| **F8** | `alta-clinica` y la entrega al cliente | ✅ Cerrada |
 
 ### F1 · Base de datos y RLS
 
@@ -354,8 +354,25 @@ de aclaracion, y un clic del interruptor deja dos apuntes en `auditoria`.
 
 ### F8 · Alta de clínica y entrega
 
-El guion que entrevista a una clínica nueva y genera su seed. Ver §11: hay tres
-cosas que hoy no se siembran y tienen que entrar aquí.
+**Dar de alta una clínica pasa a ser UN procedimiento**, y está escrito en
+`entregas/alta-de-una-clinica.md`: la entrevista (`/alta-clinica`) escribe una
+ficha, `pnpm alta` la ejecuta entera —incluidos los usuarios del panel, que no
+se pueden crear con un INSERT— y `pnpm alta:comprobar` levanta el acta contra la
+base de verdad.
+
+**El acta no dice «apto».** Dice cuatro de cinco, porque el quinto —el orden de
+los parámetros de las plantillas aprobadas en Meta— no se puede comprobar desde
+el código: Meta devuelve 200 igual y el paciente recibe la fecha donde iba su
+nombre. Ese se comprueba con un centinela numerado y un móvil delante
+(`entregas/plantillas-meta.md`).
+
+Lo que el acta mira que antes no miraba nadie: que `politica_privacidad` y
+`mensaje_urgencia` lleguen **al prompt montado** y no solo existan como fila
+—con `publico = false` existen y el bot no las recibe—, y que **lo que la ficha
+marcó como privado no lo vea el bot**, fila por fila. Y pasa la barandilla 4 con
+los datos de esa clínica, con un canario sembrado y retirado en la misma orden.
+
+Ver `ESTADO_F8`.
 
 ---
 
@@ -471,34 +488,26 @@ no existe— y la cabecera de `src/proxy.ts`, que *citaba* a `.claude/CLAUDE.md`
 diciendo la frase y se quedaba desmintiendo a su fuente en cuanto se corrigió el
 original. Un `grep` es tan bueno como los términos que se le den.
 
-### Para F8 · `alta-clinica`
+### Cerrado en F8 · Los cinco de `alta-clinica`
 
-Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
-**cinco** cosas y ninguna está automatizada:
+Dar de alta una clínica nueva **no es solo insertar filas**: eran **cinco** cosas
+y ninguna estaba automatizada. Hoy son **un procedimiento de tres comandos**
+(`entregas/alta-de-una-clinica.md`) y **un paso manual con su comprobación**.
 
-1. **`WHATSAPP_CLINICAS` + redespliegue.** Hay que añadir el par
-   `"<phone_number_id>": "<clinica_id>"` a la variable de entorno **y volver a
-   desplegar**, además de poner el `wa_phone_number_id` en la fila de
-   `clinicas`. Si solo se hace una de las dos, el canal rechaza sus mensajes.
-   **Es un coste operativo, no un detalle de configuración.**
-   > ⚠️ **F6 lo agrava.** Hasta ahora, una clínica que faltara en el mapa se
-   > quedaba sin contestar a quien le escribía: molesto, pero **lo nota el
-   > paciente**, que acaba llamando. Ahora además se queda **sin mandar
-   > recordatorios**, y eso no lo nota nadie hasta que alguien no se presenta a
-   > una cita. Ver `ESTADO_F6 §2.2`.
-2. **`mensaje_urgencia`** en `config`. Hoy no existe en ninguna parte del
-   repositorio, así que al escalar el paciente recibe el mensaje por defecto:
-   correcto y con el teléfono de la clínica, pero genérico.
-3. **`politica_privacidad`** en `config`. Lo usa el bloque «05 - Aviso inicial».
-4. **Los usuarios del panel.** *(Nuevo en F5.)* Hay que crearlos en Supabase
-   Auth con `rol` y `clinica_id` en `app_metadata` —nunca en `user_metadata`—.
-   Hoy los únicos que existen los crea la siembra de las pruebas, así que una
-   clínica recién dada de alta tiene panel y no tiene con qué entrar.
-5. **Aprobar sus plantillas en el panel de Meta.** *(Nuevo en F6.)*
-   `recordatorio_cita` no se ha mandado nunca a un número real, y **sus
-   parámetros son posicionales**: si se aprueba con el cuerpo en otro orden, el
-   paciente recibe la fecha donde va su nombre **sin un solo error**. No hay
-   forma de comprobarlo desde el código.
+| # | Qué era | Cómo queda |
+|---|---|---|
+| 1 | `WHATSAPP_CLINICAS` + redespliegue, y `wa_phone_number_id` en la fila | ⚠️ **Medio cerrado.** El alta escribe la fila e imprime el par exacto; el acta comprueba los **dos sentidos** (webhook, y recordatorios/purga). Añadir la variable y **volver a publicar** sigue siendo manual, y el acta dice en voz alta que mira el entorno de *esta* máquina |
+| 2 | `mensaje_urgencia` en `config` | ✅ Obligatoria en la ficha, y el acta la mira **en lo que devuelve `mensajeSeguro()`**, no en la fila |
+| 3 | `politica_privacidad` en `config` | ✅ Obligatoria en la ficha, y el acta la mira **en el prompt montado** |
+| 4 | Los usuarios del panel, con `app_metadata` | ✅ Los crea el alta, **inicia sesión una vez de verdad** para comprobar que entran y que el token lleva sus permisos, y devuelve un enlace de recuperación. El acta exige además que **ninguno** lleve `rol` ni `clinica_id` en `user_metadata` |
+| 5 | Aprobar las plantillas en Meta | ⚪ **No se puede comprobar desde el código, y no se finge que sí.** Procedimiento escrito en `entregas/plantillas-meta.md` y centinela numerado: `pnpm alta:comprobar <slug> --plantilla <móvil>` |
+
+**La trampa que el acta cierra y que no estaba en la lista de cinco:** una clave
+obligatoria con `publico = false` **existe en la base y no le llega al bot**, así
+que se comporta igual que si faltara — con la diferencia de que mirando la base
+parece que está puesta. Y, del mismo modo, una FAQ interna publicada por error es
+indistinguible de una pública si solo se mira la base: el acta compara **fila por
+fila contra la ficha**, que es donde consta lo que la clínica dijo.
 
 ### Aparcados
 
@@ -529,6 +538,9 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    agoto con la bateria de fuga y los cuatro intentos se fueron en 429 y 503.
    Un comando, dos peticiones, lo primero que haya cuota:
    `GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas`
+   ⚠️ **Reintentado el 21/09/2026 al abrir F8: cinco intentos más, un 503 y
+   cuatro 429** (`quotaValue: 20`; la cuota es DIARIA y venía gastada de la
+   víspera). **Sigue sin verificarse.** Ver `ESTADO_F8` §7.1.
 2. **🔴 El merge NO esta bloqueado, y no es una casilla sin marcar.** El
    repositorio es privado en plan gratuito y ahi GitHub no ofrece rulesets ni
    proteccion de rama: `GET /rulesets` devuelve `403 · "Upgrade to GitHub Pro
@@ -553,6 +565,25 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    clinica sale a produccion con esta clave, eso no es un limite de pruebas:
    es un limite de producto.
 
+### Nuevo en F8
+
+> La copia viva de esta lista pasa a `ESTADO_F8` §8. **Si se toca una, se toca
+> la otra.**
+
+1. **⚠️ El punto 1 del alta sigue siendo medio manual.** Añadir el par a
+   `WHATSAPP_CLINICAS` y **volver a publicar** no se puede hacer ni comprobar
+   desde aquí: el acta mira el entorno de la máquina donde corre, y lo dice.
+   **Lo que F9 puede cerrar:** una ruta de salud que diga **qué clínicas conoce
+   el despliegue**, y entonces el acta se lo pregunta al sitio publicado en vez
+   de a esta máquina.
+2. **⚠️ `WHATSAPP_CLINICAS` no está en `.env.local`.** Hallazgo de F8: la
+   variable no existe en el entorno de desarrollo y nadie se había enterado
+   porque las pruebas del canal se la ponen ellas mismas en memoria. No rompe
+   nada hoy; es el mismo agujero del punto 1 en pequeño.
+3. **El `README.md` sigue siendo el de `create-next-app`.** Ocho fases después,
+   es la primera página que ve quien abre la carpeta de código. Candidato para
+   F9, que es cuando la va a abrir alguien de fuera.
+
 ### Infraestructura
 
 1. ~~El CI no impide mezclar: falta marcar el check obligatorio.~~
@@ -566,6 +597,9 @@ Dar de alta una clínica nueva **no es solo insertar filas**. Hoy hacen falta
    en verde (562 pasadas, `tsc`, `eslint` y `next build`), el primero desde F1.
    De paso cazó que la suite se ponía **roja por no tener entorno** en un clon
    nuevo, arreglado en el mismo empujón. Ver `ESTADO_F7` §7.4.
+   ⚠️ **F8 no los ha puesto, y no por olvido:** los cuatro valores están en
+   `.env.local`, que no se lee. Ponerlos exige teclearlos, y eso lo hace una
+   persona. El procedimiento exacto (`gh secret set …`), en `ESTADO_F8` §7.2.
 3. ~~**Las pruebas de navegador tampoco corren en CI.**~~ ✅ **Cerrado en F7.**
    `pruebas-vivas` las lleva, con `playwright install --with-deps chromium`,
    `pnpm test:e2e` y subida de trazas al fallar. No se añadieron a ciegas: se

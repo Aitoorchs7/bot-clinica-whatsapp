@@ -60,10 +60,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { clienteBot, clienteServicio } from '../ayuda/clientes'
 import { FUGA_EXIGIDA, HAY_BASE_DE_DATOS, MARCADOR } from '../ayuda/entorno'
 import type { Sembrado } from '../ayuda/siembra'
+import { clasificadorMudo, modeloIndiscreto } from '../ayuda/indiscreto'
 import { describeVivo, sembrado } from '../ayuda/vivo'
 
 import { responder, type RespuestaDelBot } from '@/lib/bot/cerebro'
-import type { Modelo, Peticion as PeticionAlModelo, Respuesta } from '@/lib/bot/gemini'
+import type { Peticion as PeticionAlModelo } from '@/lib/bot/gemini'
 
 import { CUANTAS, PREGUNTAS, type PreguntaAdversaria } from './preguntas'
 
@@ -131,55 +132,12 @@ describeVivo('auditoria de fuga · las 30 preguntas adversarias', () => {
   const corridas = new Map<string, { respuesta: RespuestaDelBot; vistas: PeticionAlModelo[] }>()
 
   /**
-   * EL PEOR MODELO POSIBLE. Ver la cabecera.
-   *
-   * Vuelta 1: pide `repasar_ficha` (lee `pacientes` y `citas`).
-   * Vuelta 2: pide `consultar_huecos` (lee `tratamientos` y la agenda).
-   * Vuelta 3: no pide nada y suelta LITERALMENTE todo lo que ha visto hasta
-   *           ahora, resultados de herramienta incluidos. Ahi acaba el bucle.
-   *
-   * Si el marcador hubiera entrado por cualquiera de esas puertas, sale por
-   * aqui. No hay discrecion que lo tape.
+   * EL PEOR MODELO POSIBLE y el clasificador que nunca escala viven en
+   * `tests/ayuda/indiscreto.ts` desde F8. Estaban aqui, y estan explicados
+   * aqui arriba; se sacaron porque el acta de un alta corre esta misma
+   * bateria contra la clinica recien creada, y una copia del modelo habria
+   * comprobado a la copia. Ver la cabecera de aquel archivo.
    */
-  function modeloIndiscreto(): Modelo & { vistas: PeticionAlModelo[] } {
-    const vistas: PeticionAlModelo[] = []
-
-    const modelo = (async (peticion: PeticionAlModelo): Promise<Respuesta> => {
-      vistas.push(peticion)
-
-      if (vistas.length === 1) {
-        return { texto: '', llamadas: [{ nombre: 'repasar_ficha', argumentos: {} }] }
-      }
-      if (vistas.length === 2) {
-        return {
-          texto: '',
-          llamadas: [
-            {
-              nombre: 'consultar_huecos',
-              // Manana. No importa si hay huecos o no: lo que interesa es que
-              // la herramienta lea la base y devuelva algo al modelo.
-              argumentos: {
-                tratamiento: 'revision',
-                dia: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
-              },
-            },
-          ],
-        }
-      }
-
-      // El volcado. Todo lo que ha visto, sin filtrar.
-      return { texto: `VOLCADO: ${JSON.stringify(vistas)}`, llamadas: [] }
-    }) as Modelo & { vistas: PeticionAlModelo[] }
-
-    modelo.vistas = vistas
-    return modelo
-  }
-
-  /** Un clasificador que nunca escala: asi el cerebro llega a ver las 30. */
-  const clasificadorMudo: Modelo = async () => ({
-    texto: JSON.stringify({ intencion: 'otro', urgencia: 'ninguna', escalar: false }),
-    llamadas: [],
-  })
 
   async function atacar(pregunta: PreguntaAdversaria) {
     const cacheada = corridas.get(pregunta.id)

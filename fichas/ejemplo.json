@@ -1,0 +1,123 @@
+{
+  "slug": "sonrisa-viva",
+  "nombre": "Clínica Dental Sonrisa Viva",
+  "telefono_recepcion": "+34912345678",
+  "email_avisos": "recepcion@ejemplo.test",
+  "zona_horaria": "Europe/Madrid",
+  "trato": "usted",
+  "nombre_bot": "Marta",
+
+  "wa_phone_number_id": "123456789012345",
+  "wa_waba_id": "987654321098765",
+
+  "config": {
+    "politica_privacidad": {
+      "valor": "https://ejemplo.test/privacidad",
+      "publico": true
+    },
+    "mensaje_urgencia": {
+      "valor": "Aviso ahora mismo al equipo para que le atiendan cuanto antes. Si prefiere, puede llamarnos al 912 345 678 y le pasamos con recepción.",
+      "publico": true
+    },
+    "direccion": {
+      "valor": "Calle Mayor 1, 28013 Madrid",
+      "publico": true
+    },
+    "parking": {
+      "valor": "Hay parking público en la plaza de enfrente.",
+      "publico": true
+    },
+    "margen_implantes": {
+      "valor": "Coste 320 €, precio 1.450 €",
+      "publico": false,
+      "comentario": "Interno. El bot no lo ve: la RLS no le devuelve las filas con publico=false."
+    },
+    "convenio_mutua": {
+      "valor": "Acuerdo con la mutua X hasta 2027, descuento del 18%",
+      "publico": false,
+      "comentario": "Interno."
+    }
+  },
+
+  "gabinetes": ["Gabinete 1", "Gabinete 2"],
+
+  "horarios": [
+    { "dia": "lunes", "de": "09:00", "a": "14:00" },
+    { "dia": "lunes", "de": "15:30", "a": "20:00" },
+    { "dia": "martes", "de": "09:00", "a": "14:00" },
+    { "dia": "martes", "de": "15:30", "a": "20:00" },
+    { "dia": "miercoles", "de": "09:00", "a": "14:00" },
+    { "dia": "miercoles", "de": "15:30", "a": "20:00" },
+    { "dia": "jueves", "de": "09:00", "a": "14:00" },
+    { "dia": "jueves", "de": "15:30", "a": "20:00" },
+    { "dia": "viernes", "de": "09:00", "a": "14:00" }
+  ],
+
+  "tratamientos": [
+    {
+      "codigo": "REV",
+      "nombre": "Revisión",
+      "duracion_min": 30,
+      "frase_bot": "La revisión dura media hora.",
+      "publico": true,
+      "motivo": "revision"
+    },
+    {
+      "codigo": "LIMP",
+      "nombre": "Limpieza",
+      "duracion_min": 45,
+      "gabinete": "Gabinete 1",
+      "frase_bot": "La limpieza dura unos tres cuartos de hora.",
+      "publico": true,
+      "motivo": "revision"
+    },
+    {
+      "codigo": "ORTO",
+      "nombre": "Primera visita de ortodoncia",
+      "duracion_min": 45,
+      "gabinete": "Gabinete 2",
+      "frase_bot": "La primera visita de ortodoncia dura unos tres cuartos de hora.",
+      "publico": true,
+      "motivo": "ortodoncia"
+    },
+    {
+      "codigo": "IMP",
+      "nombre": "Estudio de implante",
+      "duracion_min": 60,
+      "publico": false,
+      "motivo": "otro"
+    }
+  ],
+
+  "faq": [
+    {
+      "pregunta": "¿Dónde estáis?",
+      "respuesta": "Estamos en la calle Mayor 1, en Madrid, al lado de la plaza.",
+      "publico": true,
+      "categoria": "la clinica"
+    },
+    {
+      "pregunta": "¿Tenéis parking?",
+      "respuesta": "No tenemos parking propio, pero hay uno público en la plaza de enfrente.",
+      "publico": true,
+      "categoria": "la clinica"
+    },
+    {
+      "pregunta": "¿Atendéis por la Seguridad Social?",
+      "respuesta": "Somos una clínica privada, no atendemos por la Seguridad Social.",
+      "publico": true,
+      "categoria": "pagos"
+    },
+    {
+      "pregunta": "¿Cuánto nos cuesta un implante a nosotros?",
+      "respuesta": "Coste de laboratorio 320 €, se factura a 1.450 €.",
+      "publico": false,
+      "categoria": "interno"
+    }
+  ],
+
+  "usuarios": [
+    { "email": "propietaria@ejemplo.test", "rol": "propietario" },
+    { "email": "recepcion@ejemplo.test", "rol": "recepcion" }
+  ]
+}
