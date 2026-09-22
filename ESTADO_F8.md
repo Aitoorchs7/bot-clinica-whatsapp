@@ -5,7 +5,26 @@
 > comandos y un paso manual con su comprobación**, y el acta que lo cierra **no
 > dice «apto»**: dice cuatro de cinco y cuál falta.
 
-Fecha: 21/09/2026 · Rama `f1-base-de-datos-y-rls`
+Fecha: 21/09/2026, cerrada el 22/09/2026 · Rama `f1-base-de-datos-y-rls`
+
+---
+
+## 🔴 PENDIENTE · NO APROBADO · el `thought_signature` contra Gemini
+
+**Esto va lo primero para que no se pueda leer como hecho.** El arreglo de F7
+(`ESTADO_F7` §4.1) sigue **sin verificarse contra Gemini de verdad**: cinco
+intentos el 21/09 y **ninguno llegó al modelo** (un 503 y cuatro 429 de cuota
+diaria, `quotaValue: 20`). Ver §7.1.
+
+**No vale darlo por bueno con un doble ni con una respuesta cacheada**: eso
+mediría el simulador, y lo que hay que saber es si **Gemini** acepta la segunda
+vuelta con la firma de pensamiento. La única prueba admisible es la llamada
+real, y hay que repetirla cuando la cuota resetee:
+
+    GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas
+
+Hasta que eso salga en verde, **sigue siendo un pendiente rojo y es gate antes
+de F9**, no de F8. Lo que F8 entrega no depende de ello.
 
 ---
 
@@ -18,6 +37,8 @@ Fecha: 21/09/2026 · Rama `f1-base-de-datos-y-rls`
 | `scripts/ficha.mjs` | Lee y **valida** la ficha del alta. Puro: ni red ni base. Es lo único del alta que corre en CI |
 | `scripts/alta-clinica.mjs` · `pnpm alta` | El alta entera: clínica, gabinetes, horarios, tratamientos, FAQ, `config`, bloques de prompt y **usuarios del panel** |
 | `scripts/comprobar-alta.mjs` · `pnpm alta:comprobar` | El lanzador del acta y su veredicto |
+| `scripts/usuarios.mjs` | Quitar `rol` y `clinica_id` de `user_metadata` **de verdad** (§5.1). Lo usa el alta |
+| `tests/alta/04-usuarios-del-panel.test.ts` | 9 pruebas de lo anterior: 5 puras y 4 contra Supabase. Van en `pnpm test` |
 | `vitest.alta.mts` | La configuración del acta. **Sin `globalSetup`**, que es la razón de que exista |
 | `tests/alta/01-ficha.test.ts` | 29 pruebas del validador. Van en `pnpm test` |
 | `tests/alta/02-acta.comprobacion.ts` | El acta: los cuatro puntos comprobables + la barandilla 4 con los datos de esa clínica |
@@ -34,8 +55,8 @@ Fecha: 21/09/2026 · Rama `f1-base-de-datos-y-rls`
    clínica **que no existía** — que es el único caso que demuestra algo.
 2. `pnpm alta:comprobar alta-demo` en verde, dos veces seguidas con el mismo
    número.
-3. **Trece demostraciones en rojo**, cada rotura con su restauración en la misma
-   orden (`trap … EXIT`).
+3. **Catorce demostraciones en rojo**, cada rotura con su restauración en la
+   misma orden (`trap … EXIT`).
 4. `pnpm lint`, `pnpm exec tsc --noEmit`, la suite entera dos veces y
    `pnpm test:e2e`.
 
@@ -58,9 +79,11 @@ Salida real en §6.
   alta.
 - La ficha de una clínica real no se sube al repositorio (`.gitignore`).
 
-**FALLOS** — lo que se encontró por el camino, en §5 y §7. El más instructivo no
-está en el código entregado: **una restauración que no restauraba**, y solo la
-cazó volver a correr el acta al final (§5.1).
+**FALLOS** — lo que se encontró por el camino, en §5 y §7. El más instructivo
+nació fuera del código entregado —**una restauración que no restauraba**, cazada
+solo por volver a correr el acta al final—, y acabó dentro: el hueco que lo hacía
+inevitable era que nada en el repositorio sabía quitar esos claims. Ahora sí, con
+su prueba vista en rojo. §5.1.
 
 ---
 
@@ -312,6 +335,7 @@ versión anterior del archivo no demuestra nada sobre la que se entrega.
 | 11 | Una ficha sin `mensaje_urgencia` | `pnpm alta` se niega **y no toca la base**: `clinicas con ese slug: 0` |
 | 12 | Relanzar el alta sobre una clínica que existe | Se para y explica `--continuar` |
 | 13 | Un rol que no existe en `app_metadata` (`administrador`) | punto 4 · **2 rojos**: el rol inválido y «hay al menos un propietario» |
+| 14 | `parcheParaBorrarClaims` vuelve a devolver `{}` | `04-usuarios-del-panel` · **5 rojos**, uno de ellos contra Supabase de verdad (§5.1) |
 
 Salida literal de tres de ellos:
 
@@ -357,6 +381,75 @@ revés: no un verde que no mira, sino **una restauración que no restaura**. La
 regla que lo evita es la que ya estaba escrita —romper y restaurar en la misma
 orden— más una que esta fase añade: **después de todas las roturas, el verde
 tiene que volver, y hay que verlo**.
+
+#### ✅ Y arreglado en el código, no solo contado
+
+Primero, lo que no era: el fallo estaba en el guion de las demostraciones, que
+vive en el scratchpad de la sesión. **El repositorio no escribía `user_metadata`
+en ningún sitio** (`grep -rn user_metadata src/ scripts/ tests/`), así que no
+había ninguna línea entregada con el fallo dentro.
+
+Lo que sí había era el hueco que lo hacía inevitable: el acta **detecta** los
+claims en `user_metadata` y se pone roja, y **no había forma de quitarlos**. El
+siguiente que lo necesitara iba a escribir `{}`, que es lo que escribe
+cualquiera. Así que:
+
+- **`scripts/usuarios.mjs`** · `parcheParaBorrarClaims()` (pura) los **nombra y
+  los manda a `null`**, uno por uno, y `limpiarClaimsDeUsuario()` los aplica **y
+  vuelve a leer al usuario** para comprobar que se han ido. Que el `update`
+  devuelva 200 no demuestra nada: con `{}` devuelve 200 y no borra.
+- **`pnpm alta`** lo llama para cada usuario que ya existía. Es lo único que
+  toca de un usuario ajeno, y lo dice en voz alta.
+- **`tests/alta/04-usuarios-del-panel.test.ts`** · 9 pruebas. La mitad pura
+  exige que el parche **no sea `{}`**; la mitad viva lo manda a Supabase de
+  verdad, porque la afirmación es sobre el comportamiento de otro y medirla con
+  un doble sería medir el doble (la lección de F7).
+
+Sonda contra el proyecto de desarrollo, 22/09/2026, que es de donde sale todo lo
+anterior:
+
+```
+al crear      : {"clinica_id":"de-mentira","email_verified":true,"rol":"propietario","tema":"oscuro"}
+tras {}       : {"clinica_id":"de-mentira","email_verified":true,"rol":"propietario","tema":"oscuro"}
+tras nulls    : {"email_verified":true,"tema":"oscuro"}
+  "rol" in md : false
+  md.tema     : "oscuro" (lo que NO se tocaba)
+```
+
+**Visto en rojo antes del arreglo** (ROJO 14 de la tabla): volviendo a poner
+`return {}` en `parcheParaBorrarClaims`, **cinco rojos**, y el más importante es
+el de la mitad viva, donde Supabase **no da error** y los claims siguen ahí:
+
+```
+ FAIL  … > nombra cada claim y lo manda a null — nunca un objeto vacio
+AssertionError: Un parche vacio no borra nada: Supabase fusiona: expected {} to not deeply equal {}
+ FAIL  … > contra Supabase de verdad > nombrarlos y mandarlos a null SI los borra
+Error: Se ha mandado el parche para borrar  de user_metadata de alta-usuarios-87e17225@ejemplo.test,
+Supabase no ha dado error, y rol y clinica_id sigue(n) ahi. NO se ha limpiado.
+      Tests  5 failed | 4 passed (9)
+```
+
+Restaurado en la misma orden (`trap … EXIT`), **9 passed dos veces seguidas**, y
+`git diff --stat scripts/usuarios.mjs` sin una sola línea: el archivo volvió
+byte a byte.
+
+Y por donde se usa de verdad, que es lo que cuenta — con la clínica de
+demostración levantada, ensuciando a la propietaria a mano:
+
+```
+== 2 · alguien se mete rol y clinica_id en user_metadata
+   el acta lo caza:
+ FAIL  … > punto 4 · … > y NINGUNO lleva rol ni clinica_id en user_metadata
+      Tests  1 failed | 145 passed | 1 skipped (147)
+
+== 3 · pnpm alta --continuar, que es quien tiene que limpiarlo
+  ⚠   alta-demo-propietaria@ejemplo.test llevaba rol y clinica_id en user_metadata
+      —donde lo edita el propio usuario— y se ha quitado de ahi. En app_metadata
+      sigue igual.
+
+== 4 · y el acta vuelve a salir, sin tocar nada a mano
+      Tests  146 passed | 1 skipped (147)
+```
 
 ---
 
@@ -430,20 +523,20 @@ La suite entera, **dos veces seguidas y el mismo número**:
 
 ```
 $ pnpm test
- Test Files  44 passed | 3 skipped (47)
-      Tests  1018 passed | 36 skipped (1054)
-   Duration  203.10s
+ Test Files  45 passed | 3 skipped (48)
+      Tests  1027 passed | 36 skipped (1063)
+   Duration  201.87s
 
 $ pnpm test
- Test Files  44 passed | 3 skipped (47)
-      Tests  1018 passed | 36 skipped (1054)
-   Duration  198.42s
+ Test Files  45 passed | 3 skipped (48)
+      Tests  1027 passed | 36 skipped (1063)
+   Duration  204.01s
 ```
 
-Venía de **989 passed | 36 skipped (1025)** en F7. Las 29 nuevas son las del
-validador de la ficha, y **ninguna toca la base**: el acta no entra en `pnpm
-test` a propósito (§3.3), y por eso el recuento de la suite no depende de que
-haya una clínica dada de alta por ahí.
+Venía de **989 passed | 36 skipped (1025)** en F7. Las 38 nuevas son las 29 del
+validador de la ficha y las 9 de la limpieza de `user_metadata` (§5.1). El
+**acta no entra en `pnpm test`** a propósito (§3.3), así que el recuento de la
+suite no depende de que haya una clínica dada de alta por ahí.
 
 Navegador:
 

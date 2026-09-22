@@ -45,6 +45,7 @@ import { randomUUID } from 'node:crypto'
 
 import { leerFicha, CLAVES_OBLIGATORIAS, DIAS } from './ficha.mjs'
 import { filasParaClinica } from './bloques-a-filas.mjs'
+import { limpiarClaimsDeUsuario } from './usuarios.mjs'
 
 // ---------------------------------------------------------------------------
 // Salida
@@ -404,6 +405,27 @@ async function principal() {
         )
       } else {
         ok(`${email} ya existe con rol ${previo.app_metadata.rol}`)
+      }
+
+      // LO UNICO QUE ESTE SCRIPT TOCA DE UN USUARIO QUE YA EXISTE, Y ES A
+      // PROPOSITO: `rol` y `clinica_id` dentro de `user_metadata`, que el
+      // propio usuario puede editar desde el navegador. Sus preferencias no
+      // se tocan; esas dos claves, si, porque son una copia de un dato de
+      // seguridad en un sitio donde no manda el servidor. El acta se pone
+      // roja si las encuentra, y hasta F8 no habia forma de quitarlas.
+      //
+      // Se borran mandandolas A NULL, una por una. Un `user_metadata: {}`
+      // devuelve 200 y no borra nada: Supabase fusiona. Ver usuarios.mjs.
+      try {
+        const { limpiado, claims } = await limpiarClaimsDeUsuario(db, previo)
+        if (limpiado) {
+          aviso(
+            `${email} llevaba ${claims.join(' y ')} en user_metadata —donde lo edita el propio ` +
+              'usuario— y se ha quitado de ahi. En app_metadata sigue igual.',
+          )
+        }
+      } catch (fallo) {
+        problema(fallo instanceof Error ? fallo.message : String(fallo))
       }
       continue
     }
