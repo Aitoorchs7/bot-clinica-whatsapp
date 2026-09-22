@@ -22,20 +22,35 @@
  *    is required for tools to work correctly... function call
  *    `default_api:escalar_a_recepcion`, position 3.»
  *
- * Es un fallo NUESTRO, no de cuota. `gemini.ts` traduce nuestras `Parte` a
- * `Content` del SDK y no arrastra el `thoughtSignature` que Gemini 3 pone en
- * cada `functionCall`: ni `Respuesta.llamadas` lo expone, ni `aContenido()` lo
- * vuelve a poner. El SDK instalado si tiene el campo
- * (`Part.thoughtSignature`, genai.d.ts), asi que no falta nada que instalar:
- * falta llevarlo de ida y vuelta.
+ * Gemini 3 pone una firma opaca en cada `functionCall` que predice y EXIGE que
+ * se le devuelva. La trampa esta en donde vive: no dentro del `FunctionCall`,
+ * sino al lado, en la `Part` que lo envuelve. El arreglo esta en `gemini.ts`
+ * (F7, ver FIRMA DE PENSAMIENTO alli).
  *
- * ESTA PRUEBA NO ARREGLA NADA. Deja el fallo REPRODUCIDO en el sitio mas
- * barato que hay —dos llamadas— para que quien lo arregle sepa cuando lo ha
- * arreglado. Mientras no se arregle, se pone roja, y eso es lo correcto: el
- * bucle de herramientas contra `gemini-3.6-flash` esta roto hoy en produccion
- * y no se informa de otra manera.
+ * =========================================================================
+ * POR QUE ESTA PRUEBA ESTUVO ROJA DESPUES DE ESTAR ARREGLADO EL FALLO
+ * =========================================================================
  *
- * Gasta DOS peticiones de las veinte diarias del tier gratuito. Por eso esta
+ * Nacio para REPRODUCIR el 400, asi que armaba la vuelta 2 a mano. Cuando el
+ * arreglo entro, entro en el bucle de `cerebro.ts` — no en la copia de aqui,
+ * que siguio tirando la firma por el camino. Resultado: 400 otra vez, y una
+ * prueba de contrato afirmando que el bot estaba roto cuando no lo estaba.
+ * Es la leccion de F7 al derecho: una prueba que copia al llamante comprueba
+ * a la copia. Por eso el turno de vuelta lo arma ahora
+ * `turnoConLasLlamadas()`, la misma funcion —no una igual— que usa el bucle.
+ *
+ * =========================================================================
+ * LAS TRES COSAS QUE MIRA, Y POR QUE SON TRES Y NO UNA
+ * =========================================================================
+ *
+ *   1 · Gemini manda la firma, y nuestro parser la saca de la Part.
+ *   2 · SIN ella, Gemini CORTA con un 400. Es el control negativo, y es lo
+ *       que hace que el punto 3 signifique algo: sin este, un verde podria
+ *       ser «Gemini ya no las pide» y nadie se enteraria de que el bot
+ *       dejo de mandarla.
+ *   3 · CON ella, por donde pasa de verdad, la segunda vuelta entra.
+ *
+ * Gasta TRES peticiones de las veinte diarias del tier gratuito. Por eso esta
  * separada de la bateria de fuga: se puede correr sola.
  *
  *   GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas
@@ -45,7 +60,7 @@ import { expect, it } from 'vitest'
 import { avisarSiNoHayGemini } from '../ayuda/entorno'
 import { describeConGemini } from '../ayuda/vivo'
 
-import { MODELO_CEREBRO, SIN_PENSAR, modeloDeGoogle } from '@/lib/bot/gemini'
+import { MODELO_CEREBRO, SIN_PENSAR, modeloDeGoogle, turnoConLasLlamadas } from '@/lib/bot/gemini'
 import type { TurnoDelModelo } from '@/lib/bot/gemini'
 import { declaraciones } from '@/lib/bot/herramientas'
 
@@ -53,9 +68,13 @@ avisarSiNoHayGemini()
 
 describeConGemini('el bucle de herramientas, dos vueltas', () => {
   it(
-    'se le puede devolver al modelo una llamada suya y el resultado',
+    'la firma de pensamiento vuelve con su llamada, y Gemini acepta la segunda vuelta',
     async () => {
       const modelo = modeloDeGoogle()
+      const saludo: TurnoDelModelo = {
+        rol: 'usuario',
+        partes: [{ tipo: 'texto', texto: 'Hola, soy yo otra vez' }],
+      }
 
       // Vuelta 1 · que pida algo. `repasar_ficha` no lleva argumentos, asi que
       // es la que menos cosas puede salir mal por el camino.
@@ -64,7 +83,7 @@ describeConGemini('el bucle de herramientas, dos vueltas', () => {
         sistema:
           'Eres el asistente de una clinica dental. Antes de nada, mira la ficha del ' +
           'paciente con repasar_ficha. No contestes sin haberla mirado.',
-        turnos: [{ rol: 'usuario', partes: [{ tipo: 'texto', texto: 'Hola, soy yo otra vez' }] }],
+        turnos: [saludo],
         herramientas: declaraciones(),
         presupuestoPensamiento: SIN_PENSAR,
       })
@@ -77,39 +96,67 @@ describeConGemini('el bucle de herramientas, dos vueltas', () => {
 
       const llamada = primera.llamadas[0]!
 
-      // Vuelta 2 · exactamente lo que arma `cerebro.ts`: su llamada, y debajo
-      // el resultado. Aqui es donde salta el 400.
-      const turnos: TurnoDelModelo[] = [
-        { rol: 'usuario', partes: [{ tipo: 'texto', texto: 'Hola, soy yo otra vez' }] },
-        {
-          rol: 'modelo',
-          partes: [
-            { tipo: 'llamada', nombre: llamada.nombre, argumentos: llamada.argumentos },
-          ],
-        },
-        {
-          rol: 'usuario',
-          partes: [
-            {
-              tipo: 'resultado',
-              nombre: llamada.nombre,
-              resultado: { ok: true, conocido: true, nombre: 'Ana', proximas_citas: [] },
-            },
-          ],
-        },
-      ]
+      // 1 · La firma llega. El SDK la deja en la Part que envuelve al
+      // functionCall, y `respuesta.functionCalls` —el atajo comodo— la tira
+      // sin avisar; si esto se pone rojo, es que `preguntar()` volvio al atajo.
+      expect(
+        llamada.firma,
+        'Gemini no ha mandado firma, o `preguntar()` no la esta recogiendo de la Part. ' +
+          'Sin firma no hay nada que devolver y el punto 3 saldria verde por ausencia.',
+      ).toBeTypeOf('string')
 
+      const resultado: TurnoDelModelo = {
+        rol: 'usuario',
+        partes: [
+          {
+            tipo: 'resultado',
+            nombre: llamada.nombre,
+            resultado: { ok: true, conocido: true, nombre: 'Ana', proximas_citas: [] },
+          },
+        ],
+      }
+      const sistema = 'Eres el asistente de una clinica dental. Saluda a Ana por su nombre.'
+
+      // 2 · El control negativo. Se le manda SU llamada sin la firma —que es
+      // exactamente lo que hacia el bot antes del arreglo— y tiene que cortar.
+      // Si algun dia esto pasa a estar verde, Gemini habra dejado de exigirla:
+      // buena noticia, pero entonces el punto 3 ya no demuestra nada y hay que
+      // releer este archivo antes de fiarse de el.
+      const sinFirma: TurnoDelModelo = {
+        rol: 'modelo',
+        partes: [{ tipo: 'llamada', nombre: llamada.nombre, argumentos: llamada.argumentos }],
+      }
+
+      const corte = await modelo({
+        modelo: MODELO_CEREBRO,
+        sistema,
+        turnos: [saludo, sinFirma, resultado],
+        herramientas: declaraciones(),
+        presupuestoPensamiento: SIN_PENSAR,
+      }).then(
+        () => null,
+        (fallo: unknown) => (fallo instanceof Error ? fallo.message : String(fallo)),
+      )
+
+      expect(
+        corte,
+        'Sin la firma, Gemini tendria que cortar con un 400 y ha contestado tan tranquilo.',
+      ).not.toBeNull()
+      expect(corte).toMatch(/thought_signature/)
+      expect(corte).toMatch(/400|INVALID_ARGUMENT/)
+
+      // 3 · Y ahora por donde pasa de verdad: el turno lo arma la misma funcion
+      // que usa el bucle de `cerebro.ts`, no una copia de ella.
       const segunda = await modelo({
         modelo: MODELO_CEREBRO,
-        sistema: 'Eres el asistente de una clinica dental. Saluda a Ana por su nombre.',
-        turnos,
+        sistema,
+        turnos: [saludo, turnoConLasLlamadas([llamada]), resultado],
         herramientas: declaraciones(),
         presupuestoPensamiento: SIN_PENSAR,
       })
 
-      // Si esto llega, el bucle de herramientas funciona contra el modelo real.
       expect(segunda.texto.length + segunda.llamadas.length).toBeGreaterThan(0)
     },
-    120_000,
+    180_000,
   )
 })

@@ -179,6 +179,35 @@ export function aContenido(turnos: readonly TurnoDelModelo[]): Content[] {
   }))
 }
 
+/**
+ * El turno que hay que devolverle al modelo con SUS PROPIAS llamadas, antes de
+ * mandarle los resultados.
+ *
+ * Son cinco lineas y vive aqui, exportada, por una razon concreta: es donde se
+ * pone —o se pierde— la firma de pensamiento. Cuando esto estaba escrito a mano
+ * dentro del bucle de `cerebro.ts`, la prueba de contrato lo copiaba a mano
+ * tambien; el arreglo entro en el bucle y no en la copia, y la prueba siguio
+ * roja contra Gemini de verdad diciendo que el bot estaba roto cuando no lo
+ * estaba. Una prueba que copia al llamante comprueba a la copia.
+ *
+ * Ahora el bucle y la prueba llaman a esta. Si alguien quita la firma de aqui,
+ * se entera por los dos sitios.
+ */
+export function turnoConLasLlamadas(llamadas: readonly LlamadaAHerramienta[]): TurnoDelModelo {
+  return {
+    rol: 'modelo',
+    partes: llamadas.map((llamada) => ({
+      tipo: 'llamada' as const,
+      nombre: llamada.nombre,
+      argumentos: llamada.argumentos,
+      // La firma de pensamiento viaja de vuelta con su llamada. Sin esta
+      // linea, la vuelta siguiente se va en un 400 contra Gemini 3: ver
+      // FIRMA DE PENSAMIENTO en la cabecera y ESTADO_F7 §4.1.
+      ...(llamada.firma === undefined ? {} : { firma: llamada.firma }),
+    })),
+  }
+}
+
 function exigir(clave: string): string {
   const valor = process.env[clave]
   if (!valor) {

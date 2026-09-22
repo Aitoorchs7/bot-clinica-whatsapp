@@ -525,7 +525,8 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
 
 > Copia de `ESTADO_F7` §8. **Si se toca una, se toca la otra.**
 
-1. **🔴 Confirmar contra Gemini el arreglo del `thought_signature`.**
+1. ~~**🔴 Confirmar contra Gemini el arreglo del `thought_signature`.**~~
+   **✅ CERRADO el 22/09/2026.** Ver `ESTADO_F8` §7.1.
    El fallo: el bucle devolvia `400 INVALID_ARGUMENT` contra
    `gemini-3.6-flash` en la SEGUNDA vuelta porque `gemini.ts` no arrastraba el
    `thoughtSignature` que Gemini 3 pone en cada `functionCall`. Vivia al lado
@@ -534,13 +535,16 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    llamadas de UNA vuelta.
    **✅ Arreglado en F7**, con contrato y con cinco pruebas vistas en rojo
    (`tests/bot/06-firma-de-pensamiento.test.ts`).
-   **⚠️ PERO NADIE HA VISTO A GEMINI ACEPTARLO:** la cuota diaria (20) se
-   agoto con la bateria de fuga y los cuatro intentos se fueron en 429 y 503.
-   Un comando, dos peticiones, lo primero que haya cuota:
-   `GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas`
-   ⚠️ **Reintentado el 21/09/2026 al abrir F8: cinco intentos más, un 503 y
-   cuatro 429** (`quotaValue: 20`; la cuota es DIARIA y venía gastada de la
-   víspera). **Sigue sin verificarse.** Ver `ESTADO_F8` §7.1.
+   **✅ Y visto aceptar por Gemini el 22/09/2026**, con la cuota reseteada:
+   `1 passed` dos veces (15:39 y 15:40) contra `gemini-3.6-flash`, y en rojo
+   con la firma quitada, en la misma orden que la restaura.
+   ⚠️ **El primer intento salio rojo y NO era el codigo:** la prueba de
+   contrato armaba la vuelta 2 a mano y el arreglo de F7 habia entrado en el
+   bucle de `cerebro.ts`, no en esa copia. Llevaba desde F7 diciendo que el bot
+   estaba roto sin estarlo. De ahi sale `turnoConLasLlamadas()` en `gemini.ts`,
+   que llaman el bucle y la prueba —la misma funcion, no una igual— y cuatro
+   pruebas nuevas en `06-firma-de-pensamiento`.
+   **Gate de F9 levantado.**
 2. **🔴 El merge NO esta bloqueado, y no es una casilla sin marcar.** El
    repositorio es privado en plan gratuito y ahi GitHub no ofrece rulesets ni
    proteccion de rama: `GET /rulesets` devuelve `403 · "Upgrade to GitHub Pro
@@ -561,6 +565,11 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    a 2,1 s: apunta a dos envios concurrentes de la accion. **Es anterior a F7**
    —comprobado con todo el trabajo de la fase en `git stash`— y no es clock
    skew, que se midio.
+   ⚠️ **El 22/09/2026 paso en verde tres veces seguidas (31 de 31) sin que
+   nadie lo tocara.** No se da por arreglado: ese dia solo se tocaron
+   `gemini.ts`, `cerebro.ts` y pruebas, nada del panel. Un verde que aparece
+   solo y sin explicacion es la forma exacta de los tres falsos verdes de
+   `.claude/CLAUDE.md`. Queda abierto. Ver `ESTADO_F8` §6.3.
 5. **La cuota de Gemini son 20 peticiones al DIA por modelo.** Si la primera
    clinica sale a produccion con esta clave, eso no es un limite de pruebas:
    es un limite de producto.

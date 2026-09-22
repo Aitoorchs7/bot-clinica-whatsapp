@@ -46,7 +46,13 @@ import {
 } from '@/lib/barandillas/montaje'
 
 import { clasificar, mensajeSeguro, type Clasificacion } from './clasificador'
-import { MODELO_CEREBRO, SIN_PENSAR, type Modelo, type TurnoDelModelo } from './gemini'
+import {
+  MODELO_CEREBRO,
+  SIN_PENSAR,
+  turnoConLasLlamadas,
+  type Modelo,
+  type TurnoDelModelo,
+} from './gemini'
 import { recordatorio, ventana, type Turno } from './historial'
 import {
   CATALOGO,
@@ -254,18 +260,10 @@ async function conversarConElModelo(entrada: {
 
     if (respuesta.llamadas.length === 0) break
 
-    turnos.push({
-      rol: 'modelo',
-      partes: respuesta.llamadas.map((llamada) => ({
-        tipo: 'llamada' as const,
-        nombre: llamada.nombre,
-        argumentos: llamada.argumentos,
-        // La firma de pensamiento viaja de vuelta con su llamada. Sin esta
-        // linea, la vuelta siguiente se va en un 400 contra Gemini 3: ver
-        // FIRMA DE PENSAMIENTO en gemini.ts y ESTADO_F7 §4.1.
-        ...(llamada.firma === undefined ? {} : { firma: llamada.firma }),
-      })),
-    })
+    // La firma de pensamiento viaja de vuelta con su llamada, y por eso esto
+    // no se arma aqui a mano: la prueba de contrato contra Gemini llama a la
+    // MISMA funcion. Ver FIRMA DE PENSAMIENTO en gemini.ts y ESTADO_F7 §4.1.
+    turnos.push(turnoConLasLlamadas(respuesta.llamadas))
 
     const resultados: TurnoDelModelo['partes'][number][] = []
 

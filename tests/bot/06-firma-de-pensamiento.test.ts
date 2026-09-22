@@ -24,7 +24,7 @@
  */
 import { describe, expect, it } from 'vitest'
 
-import { aContenido, type TurnoDelModelo } from '@/lib/bot/gemini'
+import { aContenido, turnoConLasLlamadas, type TurnoDelModelo } from '@/lib/bot/gemini'
 
 const FIRMA = 'ZmlybWEtZGUtcHJ1ZWJhLW9wYWNh'
 
@@ -121,5 +121,50 @@ describe('el atajo que causo el 400', () => {
 
     expect(JSON.stringify(comoLoDevuelveLaApi.functionCalls)).not.toContain(FIRMA)
     expect(JSON.stringify(comoLoDevuelveLaApi.candidates[0]!.content.parts)).toContain(FIRMA)
+  })
+})
+
+describe('turnoConLasLlamadas · lo que el bucle le devuelve al modelo', () => {
+  // Esta funcion es el sitio exacto donde se pierde la firma si se pierde: la
+  // llaman el bucle de `cerebro.ts` y la prueba de contrato, las dos. Antes
+  // estaba escrita a mano en el bucle y copiada a mano en la prueba, y el
+  // arreglo entro solo en una de las dos.
+  it('devuelve cada llamada CON su firma', () => {
+    const turno = turnoConLasLlamadas([
+      { nombre: 'anotar', argumentos: { campo: 'nombre' }, firma: FIRMA },
+    ])
+
+    expect(turno.rol).toBe('modelo')
+    expect(turno.partes).toEqual([
+      { tipo: 'llamada', nombre: 'anotar', argumentos: { campo: 'nombre' }, firma: FIRMA },
+    ])
+  })
+
+  it('y lo que sale de aqui llega al SDK con la firma puesta', () => {
+    // El viaje entero, que es lo que de verdad importa: de la respuesta del
+    // modelo a la Part que se le manda de vuelta.
+    const contenido = aContenido([
+      turnoConLasLlamadas([{ nombre: 'anotar', argumentos: {}, firma: FIRMA }]),
+    ])
+
+    expect(contenido[0]!.parts![0]!.thoughtSignature).toBe(FIRMA)
+  })
+
+  it('una llamada sin firma no se inventa el campo', () => {
+    const turno = turnoConLasLlamadas([{ nombre: 'repasar_ficha', argumentos: {} }])
+
+    expect('firma' in turno.partes[0]!).toBe(false)
+  })
+
+  it('cada llamada se queda con la suya', () => {
+    const turno = turnoConLasLlamadas([
+      { nombre: 'anotar', argumentos: { campo: 'nombre' }, firma: 'AAA' },
+      { nombre: 'anotar', argumentos: { campo: 'telefono' }, firma: 'BBB' },
+    ])
+
+    expect(turno.partes.map((parte) => (parte.tipo === 'llamada' ? parte.firma : null))).toEqual([
+      'AAA',
+      'BBB',
+    ])
   })
 })

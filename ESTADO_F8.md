@@ -9,22 +9,32 @@ Fecha: 21/09/2026, cerrada el 22/09/2026 · Rama `f1-base-de-datos-y-rls`
 
 ---
 
-## 🔴 PENDIENTE · NO APROBADO · el `thought_signature` contra Gemini
+## ✅ VERIFICADO · el `thought_signature` contra Gemini de verdad
 
-**Esto va lo primero para que no se pueda leer como hecho.** El arreglo de F7
-(`ESTADO_F7` §4.1) sigue **sin verificarse contra Gemini de verdad**: cinco
-intentos el 21/09 y **ninguno llegó al modelo** (un 503 y cuatro 429 de cuota
-diaria, `quotaValue: 20`). Ver §7.1.
-
-**No vale darlo por bueno con un doble ni con una respuesta cacheada**: eso
-mediría el simulador, y lo que hay que saber es si **Gemini** acepta la segunda
-vuelta con la firma de pensamiento. La única prueba admisible es la llamada
-real, y hay que repetirla cuando la cuota resetee:
+**22/09/2026, 15:39.** La cuota reseteó y la llamada real se hizo. El arreglo
+de F7 (`ESTADO_F7` §4.1) **está confirmado contra `gemini-3.6-flash`**, sin
+doble y sin caché. Cómo se llegó hasta aquí, y lo que se encontró por el
+camino, en §7.1 — que ya no es un pendiente sino el relato del arreglo.
 
     GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas
 
-Hasta que eso salga en verde, **sigue siendo un pendiente rojo y es gate antes
-de F9**, no de F8. Lo que F8 entrega no depende de ello.
+     Test Files  1 passed (1)
+          Tests  1 passed (1)
+       Start at  15:39:27
+       Duration  25.83s (tests 90%, import 9%)
+
+Verde **dos veces seguidas** (15:39:27 y 15:40:52), y visto en **rojo** con la
+firma quitada, en la misma orden que lo restaura.
+
+⚠ **Pero el primer intento salió rojo, y no por el código.** La prueba de
+contrato armaba la vuelta 2 **a mano**: el arreglo de F7 había entrado en el
+bucle de `cerebro.ts` y no en esa copia, así que la prueba llevaba desde F7
+diciendo que el bot estaba roto cuando no lo estaba. Es la lección de F7 al
+derecho —una prueba que copia al llamante comprueba a la copia— y de ahí sale
+el único cambio de código de esta sesión: `turnoConLasLlamadas()`. §7.1.
+
+**Gate de F9 levantado.** El bucle de herramientas contra Gemini 3 funciona: la
+segunda vuelta —la que hace que una cita se llegue a coger— entra.
 
 ---
 
@@ -55,7 +65,7 @@ de F9**, no de F8. Lo que F8 entrega no depende de ello.
    clínica **que no existía** — que es el único caso que demuestra algo.
 2. `pnpm alta:comprobar alta-demo` en verde, dos veces seguidas con el mismo
    número.
-3. **Catorce demostraciones en rojo**, cada rotura con su restauración en la
+3. **Dieciséis demostraciones en rojo**, cada rotura con su restauración en la
    misma orden (`trap … EXIT`).
 4. `pnpm lint`, `pnpm exec tsc --noEmit`, la suite entera dos veces y
    `pnpm test:e2e`.
@@ -308,7 +318,7 @@ aparece para poner delante lo que el bot **no** tiene que ver.
 
 ---
 
-## 5 · Las doce demostraciones en rojo
+## 5 · Las dieciséis demostraciones en rojo
 
 > «Antes de dar una prueba por buena, pregúntate qué pasaría si la garantía real
 > no existiera — y demuéstralo en rojo.»
@@ -336,6 +346,8 @@ versión anterior del archivo no demuestra nada sobre la que se entrega.
 | 12 | Relanzar el alta sobre una clínica que existe | Se para y explica `--continuar` |
 | 13 | Un rol que no existe en `app_metadata` (`administrador`) | punto 4 · **2 rojos**: el rol inválido y «hay al menos un propietario» |
 | 14 | `parcheParaBorrarClaims` vuelve a devolver `{}` | `04-usuarios-del-panel` · **5 rojos**, uno de ellos contra Supabase de verdad (§5.1) |
+| 15 | `turnoConLasLlamadas()` deja de devolver la firma | `02-bucle-herramientas` **contra Gemini de verdad** · el mismo `400 · thought_signature, default_api:repasar_ficha, position 2` (§7.1) |
+| 16 | Lo mismo, sin gastar cuota | `06-firma-de-pensamiento` · **3 rojos de 4**. La cuarta afirma una ausencia y no se mueve; se informa así y no se cuenta como demostrada |
 
 Salida literal de tres de ellos:
 
@@ -524,17 +536,18 @@ La suite entera, **dos veces seguidas y el mismo número**:
 ```
 $ pnpm test
  Test Files  45 passed | 3 skipped (48)
-      Tests  1027 passed | 36 skipped (1063)
-   Duration  201.87s
+      Tests  1031 passed | 36 skipped (1067)
+   Duration  212.97s
 
 $ pnpm test
  Test Files  45 passed | 3 skipped (48)
-      Tests  1027 passed | 36 skipped (1063)
-   Duration  204.01s
+      Tests  1031 passed | 36 skipped (1067)
+   Duration  210.44s
 ```
 
-Venía de **989 passed | 36 skipped (1025)** en F7. Las 38 nuevas son las 29 del
-validador de la ficha y las 9 de la limpieza de `user_metadata` (§5.1). El
+Venía de **989 passed | 36 skipped (1025)** en F7. Las 42 nuevas son las 29 del
+validador de la ficha, las 9 de la limpieza de `user_metadata` (§5.1) y las 4 de
+`turnoConLasLlamadas()` (§7.1). El
 **acta no entra en `pnpm test`** a propósito (§3.3), así que el recuento de la
 suite no depende de que haya una clínica dada de alta por ahí.
 
@@ -552,16 +565,35 @@ $ pnpm test:e2e
 apuntes en `auditoria`, anterior a F7 y diagnosticado en `ESTADO_F7 §4.3`. No es
 de esta fase y no se ha tocado.
 
+⚠️ **Al día siguiente (22/09) salió 31 de 31, tres veces seguidas** — y eso NO
+quiere decir que esté arreglado:
+
+```
+$ pnpm test:e2e     31 passed (56.5s)
+$ pnpm test:e2e     31 passed (1.0m)
+$ pnpm test:e2e     31 passed (54.3s)
+```
+
+**Nadie lo ha arreglado.** Lo único que se tocó ese día fue `gemini.ts`,
+`cerebro.ts` y pruebas — nada del panel, del interruptor ni de `auditoria`
+(`git diff --stat`). Un verde que aparece solo y sin explicación **no es una
+garantía**: es la misma forma que tenían los tres falsos verdes de
+`.claude/CLAUDE.md`. Lo más probable es que dependa del estado de `auditoria` en
+la base de desarrollo —filas de una tirada anterior—, que es justo lo que el
+diagnóstico de `ESTADO_F7 §4.3` apuntaba. **Sigue en la lista de pendientes**
+hasta que alguien explique por qué contaba dos apuntes y ahora cuenta uno.
+
 ---
 
 ## 7 · Lo que esta fase NO ha podido comprobar
 
-Tres cosas, y ninguna se informa como si estuviera bien.
+Dos cosas, y ninguna se informa como si estuviera bien. La tercera —el
+`thought_signature`— **sí se pudo comprobar**, al día siguiente, y su relato se
+queda aquí en §7.1 porque es donde lo buscará quien lea la fase.
 
-### 7.1 · 🔴 El `thought_signature` sigue sin verse aceptado por Gemini
+### 7.1 · ✅ El `thought_signature`, aceptado por Gemini — y la prueba que mentía
 
-Era lo primero del día (`ESTADO_F7 §8`, punto 1). **Cinco intentos, ninguno
-llegó al modelo:**
+**21/09, cinco intentos, ninguno llegó al modelo:**
 
 ```
 17:32  503 · "This model is currently experiencing high demand"
@@ -572,12 +604,69 @@ llegó al modelo:**
 17:41  429 · lo mismo
 ```
 
-La cuota del tier gratuito es **diaria** y estaba gastada desde ayer. El arreglo
-sigue probado de nuestro lado (cinco pruebas, vistas en rojo en F7) y **sin
-verificar contra el modelo**. Es gate antes de F9, no antes de F8. Un comando,
-dos peticiones, lo primero que haya cuota:
+**22/09, con la cuota reseteada, la llamada salió — y salió roja:**
 
-    GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas
+```
+FAIL  tests/bot-contrato/02-bucle-herramientas.test.ts
+ApiError: {"error":{"code":400,"message":"Function call is missing a
+thought_signature in functionCall parts. This is required for tools to work
+correctly, and missing thought_signature may lead to degraded model
+performance. Additional data, function call `default_api:repasar_ficha` ,
+position 2. ...","status":"INVALID_ARGUMENT"}}
+ ❯ preguntar src/lib/bot/gemini.ts:209:23
+ ❯ tests/bot-contrato/02-bucle-herramientas.test.ts:102:23
+```
+
+Ese rojo ya dice dos cosas ciertas antes de mirar nada: **hay cuota** (la vuelta
+1 pasó; un 400 no es un 429) y **Gemini exige la firma de verdad**, hoy, contra
+`gemini-3.6-flash`.
+
+**Pero no decía lo que parecía decir.** La prueba había nacido en F7 para
+REPRODUCIR el 400, así que armaba la vuelta 2 a mano:
+
+```ts
+{ tipo: 'llamada', nombre: llamada.nombre, argumentos: llamada.argumentos }
+//                                        ^ y la firma se queda fuera
+```
+
+El arreglo de F7 entró en el bucle de `cerebro.ts` —`...(llamada.firma ===
+undefined ? {} : { firma: llamada.firma })`— y **no en la copia de la prueba**.
+Resultado: una prueba de contrato llevaba desde F7 afirmando que el bot estaba
+roto **cuando el bot no lo estaba**. Es la lección de F7 al derecho, y esta vez
+con el daño al otro lado: una prueba que copia al llamante comprueba a la copia,
+y la copia puede quedarse tanto en un falso verde como en un falso rojo.
+
+**El arreglo (único cambio de código de esta sesión):** `turnoConLasLlamadas()`
+en `gemini.ts`, exportada. La llaman el bucle y la prueba, **la misma función,
+no una igual**. Si alguien le quita la firma, se enteran los dos sitios.
+
+**Y entonces, la llamada real:**
+
+```
+$ GEMINI_VIVO=1 pnpm vitest run tests/bot-contrato/02-bucle-herramientas
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  15:39:27
+   Duration  25.83s (tests 90%, import 9%)
+```
+
+Otra vez a las 15:40:52, mismo resultado. **La segunda vuelta del bucle de
+herramientas entra en Gemini 3.** Gate de F9 levantado.
+
+**Qué mira ahora la prueba, y por qué son tres peticiones y no una:**
+
+| | Qué | Por qué está |
+|---|---|---|
+| 1 | `llamada.firma` es un `string` | Si `preguntar()` volviera al atajo `respuesta.functionCalls`, la firma llegaría vacía y el punto 3 saldría **verde por ausencia** |
+| 2 | **Sin** la firma, Gemini corta con `400 thought_signature` | El control negativo. Sin él, un verde podría significar «Gemini ya no la pide» y nadie se enteraría de que el bot dejó de mandarla |
+| 3 | **Con** ella, vía `turnoConLasLlamadas()`, la vuelta 2 entra | Lo que se quería saber, por donde pasa de verdad |
+
+**Visto en rojo** (`trap … EXIT`, rotura y restauración en la misma orden):
+quitando la firma de `turnoConLasLlamadas()`, el punto 3 muere en el mismo
+`400 · default_api:repasar_ficha, position 2`. Y sin gastar cuota, las cuatro
+pruebas nuevas de `tests/bot/06-firma-de-pensamiento` —3 rojas de 4; la cuarta
+es la que afirma una ausencia y no se mueve, y así se informa—.
 
 ### 7.2 · 🟡 Los cuatro secretos `SUPABASE_*_DEV` del CI: no los he puesto
 
@@ -622,7 +711,9 @@ sobre `.env.local` — útil para probar sin tocar el archivo.
 > otra.** (La copia viva pasa de `ESTADO_F7 §8` a este archivo; aquel se queda
 > como registro cerrado de su fase.)
 
-1. **🔴 Confirmar el `thought_signature` contra Gemini.** §7.1. Gate antes de F9.
+1. ~~**🔴 Confirmar el `thought_signature` contra Gemini.**~~ **✅ Cerrado el
+   22/09/2026**, §7.1. Verde contra `gemini-3.6-flash` dos veces, con su rojo
+   demostrado. El gate de F9 queda levantado.
 2. **🔴 El merge no está bloqueado.** Sin cambios desde F7: el repositorio es
    privado en plan gratuito y ahí GitHub no ofrece rulesets
    (`403 · Upgrade to GitHub Pro or make this repository public`). Público, de
@@ -630,7 +721,10 @@ sobre `.env.local` — útil para probar sin tocar el archivo.
    producto.
 3. **🟡 Los cuatro secretos `SUPABASE_*_DEV`.** §7.2. Los pone una persona.
 4. **🟡 `04-interruptor.spec.ts:189`.** Un clic del interruptor deja dos apuntes
-   en `auditoria`. Anterior a F7, diagnosticado en `ESTADO_F7 §4.3`. Sigue igual.
+   en `auditoria`. Anterior a F7, diagnosticado en `ESTADO_F7 §4.3`.
+   ⚠️ **El 22/09 pasó en verde tres veces seguidas sin que nadie lo tocara**
+   (§6.3). No se da por arreglado: un verde sin explicación no es una garantía.
+   Queda abierto hasta que se sepa por qué contaba dos apuntes y ahora uno.
 5. **⚠️ El punto 1 del alta sigue siendo medio manual.** Añadir el par a
    `WHATSAPP_CLINICAS` y **volver a publicar** no se puede hacer ni comprobar
    desde aquí. Lo que F9 puede cerrar: una ruta de salud que diga **qué clínicas
