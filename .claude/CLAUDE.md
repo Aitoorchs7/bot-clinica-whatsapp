@@ -28,10 +28,17 @@ desarrollo web y no le restas rigor a la seguridad por ir más rápido.
 - Tailwind v3.4.17, Lucide React
 - Supabase (PostgreSQL, Auth, RLS) — región EU (Frankfurt), por RGPD
 - Gemini API (`@google/genai`), tier gratuito de Google AI Studio:
-  - `gemini-2.5-flash` — cerebro del bot, seis herramientas
-  - `gemini-2.5-flash-lite` — clasificador de urgencia/escalado
+  - `gemini-3.6-flash` — cerebro del bot, seis herramientas
+  - `gemini-3.1-flash-lite` — clasificador de urgencia/escalado
   - `gemini-embedding-001` truncado a 768 dims — embeddings de la FAQ
   - Una sola `GOOGLE_AI_API_KEY` cubre las tres cosas
+  - Antes eran `gemini-2.5-flash` y `gemini-2.5-flash-lite`. Se cambiaron
+    porque devuelven **404 a las claves nuevas** («no longer available to
+    new users», retirados para altas nuevas desde julio de 2026). Lo cazó
+    `tests/bot-contrato` el 18/09/2026; el detalle y los diez candidatos que
+    se probaron, en ESTADO_F3 §7.1. Van clavados a una versión y no a un
+    alias como `gemini-flash-latest`: un modelo que cambia solo invalidaría
+    la auditoría de fuga sin que nadie se entere.
 - Deepgram (`nova-3`, es) para notas de voz, con vocabulario dental propio
 - WhatsApp Business Cloud API (Meta, oficial) — nunca Baileys ni
   whatsapp-web.js en producción
@@ -46,8 +53,10 @@ desarrollo web y no le restas rigor a la seguridad por ir más rápido.
 - Componentes en TypeScript, no JS
 - Todo el texto de cara al paciente, en español de España
 - No crees archivos si puedes editar uno existente
-- `proxy.ts`, NUNCA `middleware.ts` — en Next.js 16 `middleware.ts` se
-  ignora en silencio y las rutas quedan públicas sin ningún error
+- `proxy.ts`, **nunca** `middleware.ts`: el convenio viejo está deprecado
+  desde Next.js 16 y, cuando lo retiren, el guardián dejará de ejecutarse
+  sin romper ninguna compilación. Hoy (16.3.5) todavía corre, con un aviso.
+  Medido en F5 renombrando el archivo — ver ESTADO_F5 §5.1
 - Antes de tocar un archivo, completa el contrato de cinco campos:
   ENTREGA, PRUEBA, LÍMITES, SUPUESTOS, FALLOS. Al cerrar, ejecuta PRUEBA
   y pega la salida real — no reescribas el contrato para que encaje con
@@ -94,6 +103,42 @@ desarrollo web y no le restas rigor a la seguridad por ir más rápido.
 clínica, no en Claude Opus 5 como documentaba V1. Antes de dar por bueno
 el cambio, pasa la barandilla 4 (auditoría de fuga) con Gemini y confirma
 que sigue sin decir nada fuera de lo aprobado.
+
+# Un verde no es una garantía
+
+Un resultado limpio —cero filas, un 200, ningún error— significa
+exactamente lo mismo si todo va bien que si no se ha comprobado nada. Ha
+pasado **tres veces** en este proyecto, las tres con ese disfraz:
+
+- **F1 §5.2.** «El rol lectura no puede cambiar nada» pasó en verde porque
+  la fila ya no existía: un test destructivo doce líneas más arriba la
+  había borrado. Verde por ausencia, no por permiso.
+- **F6, la limpieza destructiva.** Un `afterEach` que borraba por un
+  teléfono y un motivo que el fixture también usaba se llevaba la
+  conversación y el escalado sembrados. Salieron catorce rojos en cuatro
+  archivos ajenos — esta vez con suerte: el mismo mecanismo, un poco más
+  callado, deja **verdes** a los de al lado.
+- **F6, la clínica fantasma.** Una clínica que estaba en el entorno y no en
+  la base salía con todos los recuentos a cero y se informaba **como al
+  día**: la RLS no devuelve filas para una clínica que no existe, y cero
+  filas es indistinguible de «no hay nada que purgar».
+
+**Antes de dar una prueba por buena, pregúntate qué pasaría si la garantía
+real no existiera — y demuéstralo en rojo.** Si la prueba seguiría verde,
+no está midiendo la garantía: está midiendo otra cosa. Que la suite corra
+demuestra que corre; solo verla ponerse roja donde debe demuestra que mira.
+
+En la práctica:
+
+- Una aserción negativa cuya única prueba es una lista vacía tiene que
+  exigir primero que la fila exista, y comprobarlo con un rol distinto del
+  que se está probando.
+- «No he podido comprobarlo» nunca se informa igual que «está todo bien».
+- Una prueba que escribe para demostrar que se puede escribir tiene que
+  escribir **el valor que ya estaba**: si no, cambia el mundo para los que
+  vienen detrás y el daño aparece en el archivo de al lado.
+- Romper una garantía a propósito va en la **misma orden** que su
+  restauración (`trap volver EXIT`), nunca en pasos sueltos.
 
 # Reglas de conversación que no se negocian
 

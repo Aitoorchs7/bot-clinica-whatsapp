@@ -1,0 +1,41 @@
+{
+  "nombre": "Telefono mal dado: no se apunta a medias ni se completa por el bot",
+  "porque": "Es la regla de V1 que manda sobre la tabla T4: «si algo no cuadra, no se apunta a medias ni se completa por el bot: se vuelve a preguntar explicando que ha pasado». Y el motivo del rechazo es parte del producto: a un numero al que le faltan digitos y a uno que empieza por 3 se les contesta cosas distintas, porque se corrigen distinto.",
+  "turnos": [
+    {
+      "paciente": "Mi telefono es 61022457",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "61022457" } }] },
+        { "texto": "Me faltan digitos: un telefono espanol tiene nueve. ¿Me lo repites?" }
+      ],
+      "espera": {
+        "herramientas": ["anotar"],
+        "resultados": [{ "herramienta": "anotar", "ok": false, "motivo": "dato_no_valido", "contiene": ["nueve"] }],
+        "borrador": { "telefono": null }
+      }
+    },
+    {
+      "paciente": "Perdon, 310224571",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "310224571" } }] },
+        { "texto": "Ese no puede ser: un telefono espanol empieza por 6, 7, 8 o 9." }
+      ],
+      "espera": {
+        "resultados": [{ "herramienta": "anotar", "ok": false, "contiene": ["6, 7, 8 o 9"] }],
+        "borrador": { "telefono": null }
+      }
+    },
+    {
+      "paciente": "Es el 610 22 45 71",
+      "modelo": [
+        { "llamadas": [{ "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "610 22 45 71" } }] },
+        { "texto": "Apuntado." }
+      ],
+      "espera": {
+        "resultados": [{ "herramienta": "anotar", "ok": true }],
+        "borrador": { "telefono": "+34610224571" }
+      }
+    }
+  ],
+  "alFinal": { "citas": 0, "escalados": 0 }
+}

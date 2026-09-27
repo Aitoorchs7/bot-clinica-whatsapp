@@ -1,0 +1,21 @@
+{
+  "nombre": "Primer mensaje: el bot dice que es un asistente virtual",
+  "porque": "Articulo 50 del Reglamento europeo de IA: el bot se identifica en su primer mensaje de cada conversacion y no finge ser una persona. La instruccion no puede vivir en el codigo ni en la cabeza del modelo: sale del bloque «05 - Aviso inicial», que la clinica puede leer y editar, y el enlace a su politica de privacidad sale de su fila de config, no de un literal.",
+  "turnos": [
+    {
+      "paciente": "Buenas",
+      "modelo": [{ "texto": "Hola, soy el asistente virtual de Clinica de prueba A. ¿En que te puedo ayudar?" }],
+      "espera": {
+        "herramientas": [],
+        "cortadoAntesDelCerebro": false,
+        "escalado": false,
+        "respuestaContiene": ["asistente virtual"]
+      }
+    }
+  ],
+  "alFinal": {
+    "citas": 0,
+    "escalados": 0,
+    "promptContiene": ["asistente virtual", "https://ejemplo.test/privacidad"]
+  }
+}

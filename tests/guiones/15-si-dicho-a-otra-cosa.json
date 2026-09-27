@@ -1,0 +1,41 @@
+{
+  "nombre": "Un «si» dicho a otra cosa no reserva una cita",
+  "porque": "La tercera condicion de la puerta, y la mas sutil de las tres. El paciente dice «si» a «¿es para usted?» y el modelo aprovecha para reservar. No vale: para que un si cuente como confirmacion, el paciente tiene que haber visto ESCRITA la hora antes de decirlo. Sin esta condicion, cualquier si de cortesia acaba siendo una cita que nadie pidio.",
+  "turnos": [
+    {
+      "paciente": "Queria una revision. Soy Rosa Gil, 600111888, el {{DIA}}",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Rosa" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Gil" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111888" } },
+            { "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }
+          ]
+        },
+        { "texto": "Perfecto. ¿La cita es para usted?" }
+      ],
+      "espera": { "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Tengo libre a las {{HORA_LOCAL}}. ¿Se la dejo puesta a esa hora?" }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": false, "motivo": "hora_no_dicha" }]
+      }
+    },
+    {
+      "paciente": "Si, a esa hora",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Reservada a las {{HORA_LOCAL}}." }
+      ],
+      "espera": { "resultados": [{ "herramienta": "crear_cita", "ok": true }] }
+    }
+  ],
+  "alFinal": { "citas": 1, "escalados": 0 }
+}

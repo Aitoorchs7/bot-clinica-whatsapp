@@ -1,0 +1,531 @@
+/**
+ * Lo que el canal escribe y lee en la base.
+ *
+ * TODO MENSAJE SE GUARDA. ENTRANTE Y SALIENTE. ES REQUISITO DEL CLIENTE.
+ *
+ * Con `wa_message_id`, estado de entrega, tokens y coste. No es telemetria
+ * opcional: es lo que recepcion abre cuando llega un escalado, y es de donde
+ * sale el hilo al que apunta `escalados.mensaje_id`.
+ *
+ * NADA DE ESTO USA `service_role`
+ *
+ * `crearClienteBot(clinicaId)` y nada mas, igual que las herramientas de F3.
+ * El `clinica_id` viaja firmado dentro del JWT, asi que ninguna consulta de
+ * este archivo lleva `.eq('clinica_id', ...)`: repetir en la consulta un
+ * predicado que ya aplica la RLS es lo que prohibe
+ * `tests/barandillas/04-sin-filtro-en-codigo.test.ts`, y con razon — taparia
+ * una politica rota en vez de delatarla.
+ *
+ * Los INSERT si llevan `clinica_id` en la fila, porque la columna es NOT NULL
+ * y el `WITH CHECK` de la politica exige que coincida con el del token. Eso no
+ * es filtrar: es declarar de quien es la fila, y la RLS lo verifica.
+ */
+import { crearClienteBot } from '@/lib/supabase/bot'
+import type { Registro } from '@/lib/barandillas/contador'
+import type { Json } from '@/tipos/bd'
+import type { Borrador } from '@/lib/bot/herramientas'
+import type { Turno } from '@/lib/bot/historial'
+
+export type ClienteDelBot = ReturnType<typeof crearClienteBot>
+
+export function clienteDe(clinicaId: string, dado?: ClienteDelBot): ClienteDelBot {
+  return dado ?? crearClienteBot(clinicaId)
+}
+
+// ---------------------------------------------------------------------------
+// De que clinica es este webhook, confirmado contra la base
+// ---------------------------------------------------------------------------
+
+/**
+ * El mapa del entorno dice que clinica es; esto lo COMPRUEBA.
+ *
+ * `config.ts` explica por que la primera resolucion no puede ser una consulta:
+ * la RLS del rol `bot` exige saber ya de que clinica eres. Pero una vez firmado
+ * el token, la propia fila de la clinica si es legible, y ahi esta escrito su
+ * `wa_phone_number_id`. Si no coincide con el del webhook, el mapa esta mal
+ * puesto y no se atiende el mensaje: contestarle a un paciente con los datos de
+ * otra clinica es la peor cosa que puede hacer un sistema multi-inquilino.
+ *
+ * Devuelve la fila de la clinica, que hace falta luego para el telefono de
+ * recepcion y el nombre.
+ */
+export type ClinicaDelCanal = {
+  readonly id: string
+  readonly nombre: string
+  readonly telefono_recepcion: string
+  readonly email_avisos: string
+  readonly zona_horaria: string
+}
+
+export async function exigirClinicaDelCanal(
+  clinicaId: string,
+  phoneNumberId: string,
+  cliente?: ClienteDelBot,
+): Promise<ClinicaDelCanal> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  const { data, error } = await bot
+    .from('clinicas')
+    .select('id, nombre, telefono_recepcion, email_avisos, zona_horaria, wa_phone_number_id, activa')
+    .limit(2)
+
+  if (error) throw new Error(`No se ha podido leer la clinica: ${error.message}`)
+
+  // La RLS devuelve exactamente la del token. Dos filas significaria que la
+  // politica no acota por clinica, y eso no se deja pasar en silencio.
+  if (!data || data.length !== 1) {
+    throw new Error(
+      `El cliente del bot de ${clinicaId} ha visto ${data?.length ?? 0} clinicas. ` +
+        'Deberia ver exactamente una: revisa clinicas_bot_select.',
+    )
+  }
+
+  const fila = data[0]!
+
+  if (fila.id !== clinicaId) {
+    throw new Error(`El token es de ${clinicaId} pero la fila devuelta es ${fila.id}.`)
+  }
+
+  if (fila.wa_phone_number_id !== phoneNumberId) {
+    throw new Error(
+      `WHATSAPP_CLINICAS dice que ${phoneNumberId} es de la clinica ${clinicaId}, pero su ` +
+        `wa_phone_number_id es ${fila.wa_phone_number_id ?? 'null'}. No se atiende el mensaje.`,
+    )
+  }
+
+  if (!fila.activa) {
+    throw new Error(`La clinica ${clinicaId} esta dada de baja: no se atiende el mensaje.`)
+  }
+
+  return {
+    id: fila.id,
+    nombre: fila.nombre,
+    telefono_recepcion: fila.telefono_recepcion,
+    email_avisos: fila.email_avisos,
+    zona_horaria: fila.zona_horaria,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// La conversacion
+// ---------------------------------------------------------------------------
+
+/**
+ * Las columnas de `conversaciones` que necesita el canal.
+ *
+ * En una constante y no repetidas cuatro veces: `conversacionAbierta` las pide
+ * en cuatro sitios —la que existe, la que se crea, y la que se recupera tras
+ * una carrera— y en F7 se anadieron dos. Olvidar una sola de las cuatro deja
+ * el borrador a `undefined` en el camino menos transitado, que es justo el que
+ * nadie prueba.
+ */
+/**
+ * Una fila de `conversaciones` tal y como la devuelve PostgREST.
+ *
+ * `borrador` llega como `Json`, que incluye `null` y cualquier otra cosa. La
+ * columna es `not null default '{}'`, asi que en la practica es un objeto —
+ * pero eso lo garantiza el esquema, no el tipo que llega, y este archivo no da
+ * por bueno lo que no ha mirado. Un `borrador` que no sea un objeto se trata
+ * como vacio: se pierde lo que hubiera, que es molesto, en vez de reventar la
+ * conversacion de un paciente, que es peor.
+ */
+function comoBorrador(valor: unknown): Borrador {
+  if (valor === null || typeof valor !== 'object' || Array.isArray(valor)) return {}
+  return valor as Borrador
+}
+
+function aConversacion(fila: {
+  id: string
+  ventana_24h_expira: string | null
+  paciente_id: string | null
+  borrador: unknown
+  rondas_aclaracion: number | null
+}): Conversacion {
+  return {
+    id: fila.id,
+    ventana_24h_expira: fila.ventana_24h_expira,
+    paciente_id: fila.paciente_id,
+    borrador: comoBorrador(fila.borrador),
+    rondas_aclaracion: fila.rondas_aclaracion ?? 0,
+  }
+}
+
+const COLUMNAS_CONVERSACION = 'id, ventana_24h_expira, paciente_id, borrador, rondas_aclaracion'
+
+export type Conversacion = {
+  readonly id: string
+  readonly ventana_24h_expira: string | null
+  readonly paciente_id: string | null
+  /**
+   * Lo que se sabe de la cita a medias, de un mensaje al siguiente.
+   *
+   * Es el `Borrador` de `herramientas.ts` tal y como lo dejo el mensaje
+   * anterior. Viene de la columna `conversaciones.borrador` (migracion 010) y
+   * existe porque sin el NO SE COGIAN CITAS: cada mensaje empezaba de cero y
+   * `crear_cita` moria en `faltan_datos`. Ver ESTADO_F7 §4.2.
+   */
+  readonly borrador: Borrador
+  /** Cuantas aclaraciones se han pedido ya. Contra `RONDAS_MAXIMAS`. */
+  readonly rondas_aclaracion: number
+}
+
+/**
+ * La conversacion abierta de ese numero, o una nueva.
+ *
+ * La migracion 002 tiene un indice unico parcial
+ * —`conversaciones_abierta_unica_idx`, sobre (clinica_id, telefono) where
+ * estado = 'abierta'`— justo para esto: dos webhooks a la vez abrian dos hilos
+ * y el bot acababa contestandose a si mismo. Aqui el `23505` no es un fallo,
+ * es ese indice haciendo su trabajo: se vuelve a leer y se usa la que gano.
+ */
+export async function conversacionAbierta(
+  clinicaId: string,
+  telefono: string,
+  cliente?: ClienteDelBot,
+): Promise<Conversacion> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  const existente = await bot
+    .from('conversaciones')
+    .select(COLUMNAS_CONVERSACION)
+    .eq('telefono_e164', telefono)
+    .eq('estado', 'abierta')
+    .maybeSingle()
+
+  if (existente.error) {
+    throw new Error(`Buscando la conversacion: ${existente.error.message}`)
+  }
+  if (existente.data) return aConversacion(existente.data)
+
+  const creada = await bot
+    .from('conversaciones')
+    .insert({ clinica_id: clinicaId, telefono_e164: telefono, estado: 'abierta' })
+    .select(COLUMNAS_CONVERSACION)
+    .single()
+
+  if (creada.data) return aConversacion(creada.data)
+
+  if (creada.error?.code === '23505') {
+    const segunda = await bot
+      .from('conversaciones')
+      .select(COLUMNAS_CONVERSACION)
+      .eq('telefono_e164', telefono)
+      .eq('estado', 'abierta')
+      .single()
+    if (segunda.data) return aConversacion(segunda.data)
+    throw new Error(`Carrera al abrir conversacion y no se recupera: ${segunda.error?.message}`)
+  }
+
+  throw new Error(`Abriendo la conversacion: ${creada.error?.message}`)
+}
+
+/**
+ * Guarda el borrador y las rondas para el mensaje SIGUIENTE.
+ *
+ * ================== POR QUE ESTO COMPRUEBA LO QUE HA ESCRITO ==================
+ *
+ * Es la leccion de la migracion 009, literal: en PostgREST, **un UPDATE que no
+ * alcanza ninguna fila devuelve CERO FILAS Y NINGUN ERROR**. Se midio en F6
+ * intentando marcar una cita confirmada con el rol del bot:
+ *
+ *     UPDATE de una cita confirmada -> filas=0  error=ninguno
+ *
+ * Si `conversaciones_bot_update` no dejara escribir estas dos columnas, esta
+ * funcion volveria sin queja y el borrador NO se guardaria. Y el sintoma seria
+ * exactamente el de antes de la migracion 010 —cada mensaje creyendose el
+ * primero, ninguna cita cogida— pero esta vez sin nadie mirando, porque ya
+ * habria una funcion con nombre bonito que dice que lo guarda.
+ *
+ * Por eso pide `.select('id')` y mira lo que vuelve. Una fila. Si no, grita.
+ *
+ * NO TUMBA LA CONVERSACION. Igual que el contador de la barandilla 2: el
+ * paciente ya tiene su respuesta y perder el borrador es molesto, no grave.
+ * Lo que no se hace es tragarselo en silencio.
+ */
+export async function guardarBorrador(
+  cliente: ClienteDelBot | undefined,
+  clinicaId: string,
+  conversacionId: string,
+  borrador: Borrador,
+  rondasDeAclaracion: number,
+  registro?: Registro,
+): Promise<boolean> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  // Sin `.eq('clinica_id', ...)`: la RLS ya acota la fila al inquilino del
+  // token y repetirlo aqui es lo que prohibe
+  // `tests/barandillas/04-sin-filtro-en-codigo.test.ts`. Mismo criterio que
+  // `guardarVentana`.
+  const { data, error } = await bot
+    .from('conversaciones')
+    .update({
+      // El tipo generado de una columna `jsonb` es `Json`, y `Borrador` es un
+      // objeto plano de strings: encaja, pero TypeScript no lo deduce solo.
+      borrador: borrador as unknown as Json,
+      rondas_aclaracion: rondasDeAclaracion,
+      ultima_actividad: new Date().toISOString(),
+    })
+    .eq('id', conversacionId)
+    .select('id')
+
+  if (error) {
+    registro?.error(`  ⚠  No se ha podido guardar el borrador: ${error.message}`)
+    return false
+  }
+
+  if ((data ?? []).length !== 1) {
+    registro?.error(
+      '  ⚠  El borrador se ha «guardado» sin guardarse: el UPDATE no ha alcanzado ninguna ' +
+        'fila y PostgREST no da error por eso. Mira conversaciones_bot_update: sin esto, ' +
+        'cada mensaje vuelve a creerse el primero y no se coge ninguna cita.',
+    )
+    return false
+  }
+
+  return true
+}
+
+// ---------------------------------------------------------------------------
+// Los mensajes
+// ---------------------------------------------------------------------------
+
+/**
+ * El coste en euros de una respuesta.
+ *
+ * El tier gratuito de Gemini cuesta 0, asi que por defecto la columna se llena
+ * con 0 y no con un numero inventado. Cuando la clinica pase a un plan de pago,
+ * se ponen las dos tarifas en el entorno y la columna empieza a decir la verdad
+ * sin tocar codigo.
+ *
+ * Se prefiere un 0 explicito a un `null`: «no costo nada» y «no lo hemos
+ * medido» son cosas distintas, y el panel de F5 tendra que distinguirlas.
+ */
+export function costeEur(tokensEntrada: number, tokensSalida: number): number {
+  const porMillon = (clave: string): number => {
+    const valor = Number(process.env[clave] ?? '0')
+    return Number.isFinite(valor) ? valor : 0
+  }
+  const entrada = (tokensEntrada / 1_000_000) * porMillon('GEMINI_EUR_POR_MTOKEN_ENTRADA')
+  const salida = (tokensSalida / 1_000_000) * porMillon('GEMINI_EUR_POR_MTOKEN_SALIDA')
+  // La columna es numeric(10,6): mas de seis decimales los redondea Postgres.
+  return Number((entrada + salida).toFixed(6))
+}
+
+export type MensajeAGuardar = {
+  readonly clinicaId: string
+  readonly conversacionId: string
+  readonly rol: 'paciente' | 'bot' | 'sistema'
+  readonly texto: string
+  readonly waMessageId?: string
+  readonly estadoEntrega?: 'pendiente' | 'enviado' | 'entregado' | 'leido' | 'fallido'
+  readonly tokensEntrada?: number
+  readonly tokensSalida?: number
+  readonly costeEur?: number
+  readonly origen?: Record<string, unknown>
+}
+
+/**
+ * Guarda un mensaje y devuelve su `id`.
+ *
+ * ESE `id` ES EL QUE ACABA EN `escalados.mensaje_id`. Es el pendiente §8.4 de
+ * ESTADO_F3: la herramienta ya sabia apuntarlo, pero el id no existia porque
+ * nadie guardaba los mensajes todavia. Esta funcion es la que lo crea.
+ *
+ * `null` si la fila ya existia (mismo `wa_message_id`): el indice unico parcial
+ * `mensajes_wa_message_id_idx` es la idempotencia de segunda linea, por debajo
+ * de la de `eventos_webhook`.
+ */
+export async function guardarMensaje(
+  mensaje: MensajeAGuardar,
+  cliente?: ClienteDelBot,
+): Promise<number | null> {
+  const bot = clienteDe(mensaje.clinicaId, cliente)
+
+  const { data, error } = await bot
+    .from('mensajes')
+    .insert({
+      clinica_id: mensaje.clinicaId,
+      conversacion_id: mensaje.conversacionId,
+      rol: mensaje.rol,
+      texto: mensaje.texto,
+      ...(mensaje.waMessageId ? { wa_message_id: mensaje.waMessageId } : {}),
+      estado_entrega: mensaje.estadoEntrega ?? 'pendiente',
+      ...(mensaje.tokensEntrada === undefined ? {} : { tokens_in: mensaje.tokensEntrada }),
+      ...(mensaje.tokensSalida === undefined ? {} : { tokens_out: mensaje.tokensSalida }),
+      ...(mensaje.costeEur === undefined ? {} : { coste_eur: mensaje.costeEur }),
+      ...(mensaje.origen ? { origen: mensaje.origen as never } : {}),
+    })
+    .select('id')
+    .single()
+
+  if (data) return data.id
+  if (error?.code === '23505') return null
+  throw new Error(`Guardando el mensaje: ${error?.message}`)
+}
+
+/** Apunta el `wa_message_id` que devolvio Meta en la fila que ya se guardo. */
+export async function anotarWaMessageId(
+  clinicaId: string,
+  mensajeId: number,
+  waMessageId: string,
+  estado: 'enviado' | 'fallido' = 'enviado',
+  cliente?: ClienteDelBot,
+): Promise<void> {
+  const bot = clienteDe(clinicaId, cliente)
+  const { error } = await bot
+    .from('mensajes')
+    .update({ wa_message_id: waMessageId, estado_entrega: estado })
+    .eq('id', mensajeId)
+
+  if (error) throw new Error(`Anotando el wa_message_id: ${error.message}`)
+}
+
+/**
+ * Los webhooks de estado (`sent`/`delivered`/`read`/`failed`) actualizan la
+ * fila por su `wa_message_id`. No se contestan.
+ */
+const ESTADOS: Readonly<Record<string, 'enviado' | 'entregado' | 'leido' | 'fallido'>> = {
+  sent: 'enviado',
+  delivered: 'entregado',
+  read: 'leido',
+  failed: 'fallido',
+}
+
+export function aEstadoDeEntrega(
+  deMeta: string,
+): 'enviado' | 'entregado' | 'leido' | 'fallido' | undefined {
+  return ESTADOS[deMeta]
+}
+
+export async function anotarEstadoDeEntrega(
+  clinicaId: string,
+  waMessageId: string,
+  estadoDeMeta: string,
+  cliente?: ClienteDelBot,
+): Promise<boolean> {
+  const estado = aEstadoDeEntrega(estadoDeMeta)
+  // `played` y cualquier estado que Meta añada en el futuro se ignoran en vez
+  // de romper: un estado desconocido no es un fallo del canal.
+  if (!estado) return false
+
+  const bot = clienteDe(clinicaId, cliente)
+  const { data, error } = await bot
+    .from('mensajes')
+    .update({ estado_entrega: estado })
+    .eq('wa_message_id', waMessageId)
+    .select('id')
+
+  if (error) throw new Error(`Anotando el estado de entrega: ${error.message}`)
+  return (data?.length ?? 0) > 0
+}
+
+// ---------------------------------------------------------------------------
+// El historial que ve el modelo
+// ---------------------------------------------------------------------------
+
+/** Cuantos mensajes se leen de la base. `ventana()` de F3 recorta luego a 10 parejas. */
+export const MENSAJES_A_LEER = 40
+
+/**
+ * Lo dicho hasta ahora, del mas viejo al mas nuevo, SIN el mensaje de ahora.
+ *
+ * `ventana()` de `historial.ts` se encarga del recorte fino; aqui solo se evita
+ * traerse una conversacion de seiscientos mensajes por el cable.
+ */
+export async function historialDe(
+  clinicaId: string,
+  conversacionId: string,
+  hastaMensajeId: number,
+  cliente?: ClienteDelBot,
+): Promise<Turno[]> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  const { data, error } = await bot
+    .from('mensajes')
+    .select('id, rol, texto')
+    .eq('conversacion_id', conversacionId)
+    .lt('id', hastaMensajeId)
+    .order('id', { ascending: false })
+    .limit(MENSAJES_A_LEER)
+
+  if (error) throw new Error(`Leyendo el historial: ${error.message}`)
+
+  return (data ?? []).reverse().map((fila) => ({ rol: fila.rol, texto: fila.texto }))
+}
+
+// ---------------------------------------------------------------------------
+// Idempotencia
+// ---------------------------------------------------------------------------
+
+export type Anotacion = { readonly nuevo: boolean; readonly id?: number }
+
+/**
+ * Anota el evento y dice si es la primera vez que se ve.
+ *
+ * SE INSERTA Y SE MIRA EL ERROR; NO SE CONSULTA ANTES.
+ *
+ * Un `select` seguido de un `insert` deja un hueco entre las dos operaciones, y
+ * en ese hueco cabe justo el reintento de Meta: las dos invocaciones consultan,
+ * las dos ven que no existe, las dos insertan, y una crea una cita duplicada.
+ * El indice unico `(clinica_id, wa_event_id)` lo resuelve en la base, que es el
+ * unico sitio donde dos procesos se ponen de acuerdo. El `23505` ES la
+ * deteccion.
+ */
+export async function anotarEvento(
+  clinicaId: string,
+  waEventId: string,
+  carga: unknown,
+  cliente?: ClienteDelBot,
+): Promise<Anotacion> {
+  const bot = clienteDe(clinicaId, cliente)
+
+  const { data, error } = await bot
+    .from('eventos_webhook')
+    .insert({
+      clinica_id: clinicaId,
+      wa_event_id: waEventId,
+      carga: carga as never,
+    })
+    .select('id')
+    .single()
+
+  if (data) return { nuevo: true, id: data.id }
+  if (error?.code === '23505') return { nuevo: false }
+  throw new Error(`Anotando el evento del webhook: ${error?.message}`)
+}
+
+/** Deja constancia de que el evento se termino de procesar. */
+export async function marcarProcesado(
+  clinicaId: string,
+  eventoId: number,
+  cliente?: ClienteDelBot,
+): Promise<void> {
+  const bot = clienteDe(clinicaId, cliente)
+  const { error } = await bot
+    .from('eventos_webhook')
+    .update({ procesado_en: new Date().toISOString() })
+    .eq('id', eventoId)
+
+  if (error) throw new Error(`Marcando el evento como procesado: ${error.message}`)
+}
+
+// ---------------------------------------------------------------------------
+// Observabilidad
+// ---------------------------------------------------------------------------
+
+/** Un apunte en `eventos`. Nunca lleva texto del paciente. */
+export async function anotarEnEventos(
+  clinicaId: string,
+  tipo: string,
+  datos: Record<string, unknown>,
+  cliente?: ClienteDelBot,
+  registro?: Registro,
+): Promise<void> {
+  const bot = clienteDe(clinicaId, cliente)
+  const { error } = await bot
+    .from('eventos')
+    .insert({ clinica_id: clinicaId, tipo, datos: datos as never })
+
+  // Un fallo de observabilidad no tumba una conversacion.
+  if (error) registro?.error(`  ⚠  No se ha podido anotar el evento ${tipo}: ${error.message}`)
+}

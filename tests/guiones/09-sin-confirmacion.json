@@ -1,0 +1,33 @@
+{
+  "nombre": "Sin confirmacion: el modelo intenta reservar y la puerta no se abre",
+  "porque": "«No se escribe nada en la base de datos sin confirmacion explicita del paciente», y la confirmacion se mide en el mensaje que llego por WhatsApp, no en un argumento que ponga el modelo. Aqui el modelo pide crear_cita con todo completo y sin que nadie haya dicho que si: no tiene que quedar ni una fila.",
+  "turnos": [
+    {
+      "paciente": "Soy Nuria Lopez, 600111666, una revision el {{DIA}}",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Nuria" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Lopez" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111666" } },
+            { "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }
+          ]
+        },
+        { "texto": "Tengo a las {{HORA_LOCAL}}." }
+      ],
+      "espera": { "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "¿Y de que va la revision exactamente?",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Una revision dura media hora. Si quieres te la reservo a las {{HORA_LOCAL}}: dime que si y la dejo puesta." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": false, "motivo": "sin_confirmacion" }]
+      }
+    }
+  ],
+  "alFinal": { "citas": 0, "escalados": 0 }
+}

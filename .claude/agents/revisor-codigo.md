@@ -22,8 +22,10 @@ léelo entero — no adivines.
    `NEXT_PUBLIC_*`, o en el camino del bot. Crítico siempre.
 3. **Tabla sin RLS**, o política sin `WITH CHECK` en `INSERT`/`UPDATE`, o
    `auth.jwt()->'user_metadata'` donde debería ser `app_metadata`.
-4. **`middleware.ts`.** En Next.js 16 se ignora en silencio: las rutas
-   quedan públicas sin dar ningún error. Debe ser `proxy.ts`.
+4. **`middleware.ts`.** Debe ser `proxy.ts`. El convenio viejo está
+   deprecado desde Next.js 16 y, cuando lo retiren, el guardián dejará de
+   ejecutarse sin romper ninguna compilación. Hoy (16.3.5) todavía corre,
+   con un aviso — medido en ESTADO_F5 §5.1.
 5. **El modelo inventando.** Huecos de cita, precios u horarios que salen
    del modelo y no de una de las seis herramientas (`anotar`,
    `repasar_ficha`, `consultar_huecos`, `crear_cita`, `no_te_entiendo`,

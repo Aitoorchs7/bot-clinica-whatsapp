@@ -45,3 +45,12 @@ Thumbs.db
 
 # Vercel
 .vercel
+
+# Supabase CLI (estado local del enlace, nunca al repositorio)
+supabase/.temp/
+supabase/.branches/
+
+# Fichas de alta. Llevan datos de una clínica real —correos, teléfonos, notas
+# internas— y no pintan nada en el repositorio. La de ejemplo sí, sin datos.
+fichas/*.json
+!fichas/ejemplo.json

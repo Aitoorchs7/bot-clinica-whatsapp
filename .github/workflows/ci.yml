@@ -1,0 +1,235 @@
+# =============================================================================
+# CI
+# =============================================================================
+# Existe porque cuatro comentarios del repositorio afirmaban que la mitad
+# estatica de los tests de RLS "bloquea el merge en CI" cuando no habia ningun
+# CI. O se monta, o se borra la frase; se monta.
+#
+# TRES trabajos, y la diferencia importa:
+#
+#   comprobaciones-estaticas · Corre siempre, sin credenciales. Lint, tipos,
+#     compilacion y toda la mitad de la suite que no necesita base de datos.
+#     Lee los .sql de supabase/migrations y comprueba que ninguna tabla se ha
+#     quedado sin RLS y sin politicas. Demuestra que las politicas estan
+#     ESCRITAS.
+#
+#   auditoria-de-fuga · La barandilla 4. Se conecta al proyecto de desarrollo
+#     y lanza las 30 preguntas adversarias contra datos sembrados con el
+#     marcador. NO llama a Gemini: el modelo que usa es peor que Gemini a
+#     proposito (ver tests/fuga/01-bateria.test.ts). Es el trabajo que tiene
+#     que bloquear el merge.
+#
+#   pruebas-vivas · El resto del nivel 2 y las de navegador: RLS tabla por
+#     tabla como cada rol, los guiones de conversacion, los trabajos
+#     programados y Playwright sobre el panel. Demuestra que la base de datos
+#     tiene las politicas PUESTAS, que no es lo mismo que escritas.
+#
+# El nombre del primero dice lo que cubre a proposito: un tick verde que ponga
+# "comprobaciones estaticas" no se confunde con una suite completa.
+#
+# -----------------------------------------------------------------------------
+# ⚠ LO QUE ESTE ARCHIVO NO PUEDE HACER, Y HAY QUE LEERLO ANTES DE FIARSE
+# -----------------------------------------------------------------------------
+# UN WORKFLOW NO BLOQUEA NADA POR SI SOLO. Para que `auditoria-de-fuga` impida
+# mezclar hace falta un ruleset de rama sobre `main` (Settings > Rules >
+# Rulesets, o Settings > Branches) con "Require status checks to pass" y el
+# check `auditoria-de-fuga` marcado.
+#
+# Y AHI ESTA EL PROBLEMA, MEDIDO EL 21/09/2026 CONTRA LA API DE GITHUB:
+#
+#     GET /repos/Aitoorchs7/bot-clinica-whatsapp/rulesets
+#     403 · "Upgrade to GitHub Pro or make this repository public to enable
+#            this feature."
+#
+# El repositorio es PRIVADO en un plan gratuito, y ahi GitHub no ofrece ni
+# rulesets ni proteccion de rama. O sea: hoy NADA impide mezclar a `main`, y
+# no es porque falte marcar una casilla, es porque la casilla no existe.
+#
+# Las tres salidas, y ninguna se puede tomar desde aqui:
+#   1 · Hacer publico el repositorio  -> rulesets gratis.
+#   2 · GitHub Pro / Team             -> rulesets en privado.
+#   3 · Dejarlo asi                   -> entonces esta frase se queda escrita
+#                                        y nadie dice que el merge esta
+#                                        bloqueado, porque no lo esta.
+#
+# Ver ESTADO_F7 §6. Mientras siga el caso 3, este archivo INFORMA. No impide.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push nuevo sobre la misma rama cancela la ejecucion anterior.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comprobaciones-estaticas:
+    name: comprobaciones-estaticas
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Estilo
+        run: pnpm lint
+
+      # `LayoutProps` y las demas definiciones de rutas las genera Next en
+      # .next/types. En una maquina de desarrollo ya estan de un build anterior,
+      # asi que `tsc` pasa; en un clon recien hecho no existen y `tsc` falla con
+      # TS2304. `next typegen` las genera sin compilar del todo.
+      - name: Tipos de las rutas
+        run: pnpm exec next typegen
+
+      - name: Tipos
+        run: pnpm exec tsc --noEmit
+
+      # Aqui dentro van los tests de RLS que no necesitan base de datos: que
+      # toda tabla tenga `enable row level security`, que ninguna politica sea
+      # `for all`, que todo UPDATE lleve su WITH CHECK y su SELECT, que
+      # `escalados` no tenga ni una columna de texto libre, y que service_role
+      # no aparezca en el camino del bot. La mitad viva se salta sola y avisa.
+      - name: Pruebas
+        run: pnpm vitest run
+
+      - name: Compilacion
+        run: pnpm build
+
+  # ---------------------------------------------------------------------------
+  # LA BARANDILLA 4
+  # ---------------------------------------------------------------------------
+  # Este trabajo NO lleva `if:`. Es deliberado y es la diferencia entre lo que
+  # habia antes y lo que hay ahora.
+  #
+  # `pruebas-vivas` se puede apagar con una variable de repositorio porque
+  # necesita credenciales que no todo el mundo tiene. La auditoria de fuga no:
+  # un trabajo de seguridad que se apaga solo cuando falta el entorno es un
+  # tick verde que no ha mirado nada, y es el fallo que este proyecto ya ha
+  # cometido tres veces.
+  #
+  # `FUGA_EXIGIDA=1` es lo que lo garantiza por dentro: con esa variable, si
+  # falta Supabase, la bateria se pone ROJA en vez de saltarse (ver
+  # tests/ayuda/entorno.ts). Sin secretos configurados este trabajo falla, y
+  # eso es lo correcto: «no he podido comprobarlo» no se informa igual que
+  # «esta todo bien».
+  # ---------------------------------------------------------------------------
+  auditoria-de-fuga:
+    name: auditoria-de-fuga
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # El proyecto tiene que ser el de DESARROLLO. Ver la nota de
+      # `pruebas-vivas`, mas abajo: el primer cerrojo es no poner aqui el
+      # secreto de produccion.
+      - name: Preparar el entorno
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL_DEV }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY_DEV }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
+          EOF
+
+      - name: Las 30 preguntas adversarias
+        env:
+          FUGA_EXIGIDA: '1'
+        run: pnpm vitest run tests/fuga tests/barandillas
+
+      - name: Borrar el entorno
+        if: always()
+        run: rm -f .env.local
+
+  # ---------------------------------------------------------------------------
+  pruebas-vivas:
+    name: pruebas-vivas
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Se activa poniendo la variable de repositorio RLS_VIVA a "true" y los
+    # cuatro secretos de abajo. Sin eso no corre: mas vale un trabajo ausente
+    # que uno verde por no haber comprobado nada.
+    #
+    # Corre DESPUES de la auditoria de fuga y no a la vez: las dos siembran y
+    # limpian el mismo fixture del proyecto de desarrollo, y dos tiradas a la
+    # vez se pisan (ESTADO_F3 §5.4, ampliado en F5 a Playwright). Dos trabajos
+    # concurrentes contra la misma base reproducen exactamente el falso verde
+    # de F6: la limpieza de uno deja al otro sin las filas que dice comprobar.
+    needs: auditoria-de-fuga
+    if: vars.RLS_VIVA == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # La siembra crea cuatro usuarios con una contrasena que esta escrita en
+      # el repositorio y, al limpiar, borra clinicas en cascada.
+      # `exigirBaseDeDesarrollo` se niega a sembrar si encuentra pacientes o
+      # citas que no sean de las clinicas de prueba, pero el primer cerrojo es
+      # no poner aqui el secreto de produccion.
+      - name: Preparar el entorno
+        run: |
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL_DEV }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY_DEV }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
+          SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
+          EOF
+
+      - name: Tipos de las rutas
+        run: pnpm exec next typegen
+
+      - name: Toda la suite contra la base de datos
+        run: pnpm vitest run
+
+      # Playwright entra en CI en F7. No se habia añadido antes a proposito
+      # (ESTADO_F5, «Infraestructura» punto 3): un paso de CI que nadie ha
+      # visto correr es otra forma de creerse cubierto. Aqui ya se ha visto.
+      - name: Navegador
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Pruebas de navegador
+        run: pnpm test:e2e
+
+      - name: Trazas de lo que fallo
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-trazas
+          path: test-results/
+          retention-days: 7
+
+      - name: Borrar el entorno
+        if: always()
+        run: rm -f .env.local

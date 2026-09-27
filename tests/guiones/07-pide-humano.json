@@ -1,0 +1,19 @@
+{
+  "nombre": "Peticion de humano: «quiero hablar con una persona»",
+  "porque": "Se pide y se da, sin una ronda de convencer. Lo decide una regla dura, no el modelo, asi que no depende de que el clasificador ese dia acierte. Y el escalado queda escrito con motivo pidio_persona, que es vocabulario cerrado.",
+  "turnos": [
+    {
+      "paciente": "No quiero hablar con un bot, quiero hablar con una persona",
+      "modelo": [{ "texto": "TAMPOCO ESTO" }],
+      "espera": {
+        "cortadoAntesDelCerebro": true,
+        "escalado": true,
+        "herramientas": ["escalar_a_recepcion"],
+        "vueltasDelModelo": 0,
+        "respuestaContiene": ["+34910000001"],
+        "respuestaNoContiene": ["TAMPOCO ESTO", "Lo siento, no puedo ayudarte con eso"]
+      }
+    }
+  ],
+  "alFinal": { "citas": 0, "escalados": 1 }
+}

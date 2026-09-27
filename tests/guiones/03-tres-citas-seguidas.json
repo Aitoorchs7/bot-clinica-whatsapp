@@ -1,0 +1,89 @@
+{
+  "nombre": "Tres citas seguidas en la misma conversacion",
+  "porque": "V1 midio que un modelo al que se le encadenan tareas abandona por la quinta o la sexta y llega a asegurar que ha hecho algo que no hizo. Aqui se comprueba contra la base que las tres filas existen de verdad, y que el borrador SE VACIA entre una y otra: la segunda cita no hereda el nombre de la primera, hay que volver a decirlo.",
+  "turnos": [
+    {
+      "paciente": "Hola, necesito tres revisiones: para mi y para mis dos hijos",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Elena" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Vidal" } },
+            { "nombre": "anotar", "argumentos": { "campo": "telefono", "valor": "600111555" } },
+            { "nombre": "anotar", "argumentos": { "campo": "tratamiento", "valor": "revision" } }
+          ]
+        },
+        { "texto": "Vamos una a una. Empezamos por la tuya: ¿que dia?" }
+      ],
+      "espera": { "herramientas": ["anotar", "anotar", "anotar", "anotar"] }
+    },
+    {
+      "paciente": "El {{DIA}}",
+      "modelo": [
+        { "llamadas": [{ "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }] },
+        { "texto": "Para ti tengo a las {{HORA_LOCAL}}. ¿La reservo?" }
+      ],
+      "espera": { "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Lista la primera. Vamos con la de tu hijo: dime nombre y apellidos." }
+      ],
+      "espera": {
+        "herramientas": ["crear_cita"],
+        "resultados": [{ "herramienta": "crear_cita", "ok": true }],
+        "borrador": { "nombre": null, "apellidos": null, "hora": null }
+      }
+    },
+    {
+      "paciente": "Pablo Vidal, el mismo dia",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Pablo" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Vidal" } },
+            { "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }
+          ]
+        },
+        { "texto": "Para Pablo tengo a las {{HORA_LOCAL}}. ¿Se la reservo?" }
+      ],
+      "espera": {
+        "herramientas": ["anotar", "anotar", "consultar_huecos"],
+        "resultados": [{ "herramienta": "consultar_huecos", "ok": true }]
+      }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Dos. Y la tercera, ¿para quien es?" }
+      ],
+      "espera": { "resultados": [{ "herramienta": "crear_cita", "ok": true }] }
+    },
+    {
+      "paciente": "Para Sara Vidal, tambien ese dia",
+      "modelo": [
+        {
+          "llamadas": [
+            { "nombre": "anotar", "argumentos": { "campo": "nombre", "valor": "Sara" } },
+            { "nombre": "anotar", "argumentos": { "campo": "apellidos", "valor": "Vidal" } },
+            { "nombre": "consultar_huecos", "argumentos": { "tratamiento": "revision", "dia": "{{DIA}}" } }
+          ]
+        },
+        { "texto": "Para Sara tengo a las {{HORA_LOCAL}}. ¿La reservo?" }
+      ],
+      "espera": { "resultados": [{ "herramienta": "consultar_huecos", "ok": true }] }
+    },
+    {
+      "paciente": "Si",
+      "modelo": [
+        { "llamadas": [{ "nombre": "crear_cita", "argumentos": { "hora": "{{HORA_OFRECIDA}}" } }] },
+        { "texto": "Las tres reservadas." }
+      ],
+      "espera": { "resultados": [{ "herramienta": "crear_cita", "ok": true }] }
+    }
+  ],
+  "alFinal": { "citas": 3, "escalados": 0 }
+}

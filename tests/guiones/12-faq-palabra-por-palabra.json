@@ -1,0 +1,25 @@
+{
+  "nombre": "FAQ publicada: la respuesta aprobada va palabra por palabra",
+  "porque": "«Las respuestas de FAQ se dicen PALABRA POR PALABRA, no se reformulan», y lo que lo sostiene no es que el modelo obedezca: es que el texto exacto que la clinica aprobo esta en el prompt montado, sacado de su fila de faq. Este guion comprueba que llega entero y que la fila hermana, la no publicada, no llega en absoluto.",
+  "turnos": [
+    {
+      "paciente": "Hola, ¿donde estais?",
+      "modelo": [{ "texto": "En la calle Mayor 1." }],
+      "espera": {
+        "herramientas": [],
+        "cortadoAntesDelCerebro": false,
+        "respuestaContiene": ["En la calle Mayor 1."]
+      }
+    }
+  ],
+  "alFinal": {
+    "citas": 0,
+    "escalados": 0,
+    "promptContiene": [
+      "P: ¿Donde estais?",
+      "R: En la calle Mayor 1.",
+      "usa estas palabras, no las cambies"
+    ],
+    "promptNoContiene": ["ZZMARGEN-7f3a", "¿Cual es el margen de un implante?"]
+  }
+}
