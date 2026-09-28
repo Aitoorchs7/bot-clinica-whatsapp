@@ -627,10 +627,12 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    (run 36334234453): nueve pruebas no pueden lanzar SQL («Cannot find project
    ref») y cuatro son daño colateral del mensaje de hace 120 días que `03-purga`
    deja sembrado cuando la purga no corre. Punto 4 de F9.
-   🟡 **Arreglado y demostrado en local el 28/09** (`--db-url`, guarda de
-   proyecto, cerrojo de producción, y `03-purga` que borra lo suyo por id —
-   había DOS filas sin apuntar, no una—). Los 13 rojos, reproducidos con el
-   orden de los archivos fijado. Falta verlo en el CI del PR. `ESTADO_F9 §9`.
+   ✅ **Cerrado el 28/09** (`--db-url`, guarda de proyecto, cerrojo de
+   producción, y `03-purga` que borra lo suyo por id —había DOS filas sin
+   apuntar, no una—). Los 13 rojos, reproducidos con el orden de los archivos
+   fijado. Y el CI destapó un tercer fallo que en local no se veía: la CLI
+   contestaba en JSON solo cuando la lanzaba un agente. `pruebas-vivas`, verde
+   por primera vez: `1074 passed`. `ESTADO_F9 §9`.
 2. **⚠️ El bot depende del secreto JWT heredado y de la clave `anon`.** Supabase
    retira las claves `anon` y `service_role` a finales de 2026 y tiene el
    secreto heredado como «no recomendado, por compatibilidad». Fuera de F9: toca

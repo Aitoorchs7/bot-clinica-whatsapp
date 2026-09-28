@@ -249,7 +249,7 @@ aparezca no demuestra que no pasara.
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
 | 2 | El secreto JWT | 🟡 **Medio:** el proyecto sigue usando el secreto heredado (§3.4). Falta ver «aceptado» con el valor de Vercel: punto 6 |
 | 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). Faltan: la clínica en el mapa y en la base (punto 6), y **publicar la app de Meta** (§7.2) |
-| 4 | El hueco del CI | 🟡 **Hecho y demostrado en local** (§9): los 13 rojos reproducidos y resueltos con el orden fijado, y la suite dos veces igual. Falta verlo en el CI del PR |
+| 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
 | 5 | Tus decisiones | ⏳ La recomendación, en §5 al llegar |
 | 6 | La ruta de salud | 🟡 **Hecha**: niveles 1 y 2 en verde (§10). Falta **publicarla, que es tocar producción**, y preguntarle al sitio |
 
@@ -933,6 +933,24 @@ $ pnpm test   (19:13:44 UTC)   Tests  1074 passed | 36 skipped (1110)
 De paso, confirmado por `--db-url` y con la CLI en modo CI: `current_user` es
 `postgres`.
 
+### 9.8 · ✅ El CI, en verde entero (run 36471168599, commit `f58d116`)
+
+```
+comprobaciones-estaticas  success   19:17:13 → 19:19:16 UTC
+auditoria-de-fuga         success   19:17:13 → 19:19:03 UTC
+pruebas-vivas             success   19:19:07 → 19:29:27 UTC
+ Test Files  48 passed | 3 skipped (51)
+      Tests  1074 passed | 36 skipped (1110)     <- el mismo número que en local
+  31 passed (2.0m)                               <- Playwright
+```
+
+Es la primera vez que `pruebas-vivas` sale verde en este repositorio. Venía de
+13 rojos (§0.3). **Punto 4 cerrado.**
+
+(Una de las esperas en segundo plano de esta máquina terminó con «exit code
+1»: fue un corte hacia api.github.com en la espera, no el CI. Se dice aquí
+para que nadie lo lea al revés en el registro de la sesión.)
+
 ---
 
 ## 10 · Punto 6 · La ruta de salud: `/api/cron/clinicas`
@@ -1017,7 +1035,8 @@ sola cada día a las 06:15 UTC.
     salvo que se pida.
 11. **`WHATSAPP_CLINICAS` no está en `.env.local`** (de `PLAN.md` §11, «Nuevo en
     F8»). Sin cambios.
-12. **🔴 `pruebas-vivas` en rojo por `--linked`.** Nuevo en F9. Punto 4.
+12. ~~**🔴 `pruebas-vivas` en rojo por `--linked`.**~~ ✅ **Cerrado el 28/09**:
+    verde en el CI del PR #2 (§9.8).
 13. **⚠️ El bot depende del secreto JWT heredado y de la clave `anon`**, y
     Supabase retira las claves heredadas a finales de 2026 (§3.4). Nuevo en F9.
     Fuera de esta fase: toca `bot.ts`.
