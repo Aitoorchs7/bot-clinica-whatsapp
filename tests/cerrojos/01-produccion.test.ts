@@ -23,7 +23,7 @@ import {
   refDeCadenaDeConexion,
   refDeUrlSupabase,
 } from '../ayuda/entorno'
-import { cadenaDeMantenimiento, tapar } from '../ayuda/mantenimiento'
+import { cadenaDeMantenimiento, filasDeLaSalida, tapar } from '../ayuda/mantenimiento'
 
 const PRODUCCION = REFS_DE_PRODUCCION[0]!
 const URL_PRODUCCION = `https://${PRODUCCION}.supabase.co`
@@ -112,6 +112,29 @@ describe('la cadena del SQL de mantenimiento', () => {
     expect(tapado).not.toContain('Secreta99')
     expect(tapado).not.toContain(cadena)
     expect(tapado).toContain('fallo conectando a ***')
+  })
+})
+
+describe('lo que contesta la CLI (las tres formas medidas el 28/09)', () => {
+  it('con --agent no --output-format json: una lista, y se lee tal cual', () => {
+    expect(filasDeLaSalida('[\n  {\n    "n": 1,\n    "usuario": "postgres"\n  }\n]\n')).toEqual([
+      { n: 1, usuario: 'postgres' },
+    ])
+  })
+
+  it('lanzada por un agente: { boundary, rows, warning }, y se leen las rows', () => {
+    const salida = JSON.stringify({ boundary: 'x', rows: [{ n: 1 }], warning: 'untrusted' })
+    expect(filasDeLaSalida(salida)).toEqual([{ n: 1 }])
+  })
+
+  it('LA TABLA DEL CI es un ERROR, no una lista vacia: una purga sin leer no pasa por limpia', () => {
+    // Es lo que contestó la CLI en el CI del PR #2, sin `--output-format`.
+    const tabla = '┌───┐\n│ n │\n├───┤\n│ 1 │\n└───┘\n'
+    expect(() => filasDeLaSalida(tabla)).toThrow(/no hay JSON/)
+  })
+
+  it('un JSON que no son filas tambien es un error', () => {
+    expect(() => filasDeLaSalida('{"message":"algo"}')).toThrow(/no es una lista de filas/)
   })
 })
 

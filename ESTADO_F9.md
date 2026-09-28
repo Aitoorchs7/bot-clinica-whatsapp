@@ -408,18 +408,92 @@ entra con las claves y con el secreto JWT.
 
 ---
 
-## 5 · Decisiones
+## 5 · Decisiones (tuyas), con mi recomendación
 
-Se rellena al llegar al punto 5, cada una con mi recomendación y su prueba:
+Escrito el 28/09 con la documentación leída ese día. Ninguna está tomada:
+cada una espera tu respuesta.
 
-- a · `SUPABASE_SERVICE_ROLE_KEY` en producción, sin uso (§3.7).
-- b · `RESEND_API_KEY` y `EMAIL_REMITENTE`, que no están: el aviso de los
-  escalados por correo no sale.
-- c · La cuota gratuita de Gemini como límite de producto, y sus condiciones de
-  uso de datos, que hay que leer en la documentación actual antes de
-  recomendar nada.
-- d · La región de las funciones (§3.3). **Nueva.**
-- e · El registro abierto en Auth (§3.8). **Nueva.**
+### a · `SUPABASE_SERVICE_ROLE_KEY` en las variables de producción → **quitarla**
+
+- **Prueba:** nada de `src/` la lee (`grep -rn "SERVICE_ROLE\|service_role"
+  src/` → solo comentarios que dicen que no se usa). La usan `pnpm alta` y las
+  pruebas, que corren **en una máquina**, no en Vercel.
+- **Por qué:** es la llave que se salta la RLS entera. En el despliegue no hace
+  nada, salvo agrandar el daño de cualquier fallo del servidor: un registro
+  que imprima el entorno, una dependencia comprometida. Y Supabase retira las
+  claves `service_role` a finales de 2026 (§3.4).
+- **Cómo:** borrarla en Vercel y volver a publicar. Una variable borrada sigue
+  en el despliegue que ya corre hasta que se publica otro.
+
+### b · El correo de los escalados (`RESEND_API_KEY`, `EMAIL_REMITENTE`) → **sí, antes del primer paciente de verdad**
+
+- **Prueba:** el aviso al equipo tiene **dos caminos a propósito**
+  (`src/lib/whatsapp/escalado.ts`): una **plantilla de WhatsApp** al teléfono
+  de recepción y un **correo**. Sin correo, todo depende de que esa plantilla
+  esté aprobada en Meta, y eso **no lo ha comprobado nadie en producción** (es
+  el punto 5 del alta, el que no se puede comprobar desde el código). Si los
+  dos fallan, el código lo grita («EL EQUIPO NO SE HA ENTERADO DEL ESCALADO POR
+  NINGUNA VIA»), pero el equipo no se entera.
+- **Por qué importa:** ante dolor, hinchazón, golpe o sangrado la regla es
+  mensaje seguro + teléfono + **aviso al equipo**. Las dos primeras no dependen
+  de esto; la tercera, sí.
+- **Cómo:** una cuenta de Resend, un dominio de envío verificado (registros
+  DNS), la clave y el remitente en Vercel, y volver a publicar. El correo lleva
+  el teléfono del paciente (nunca lo que escribió), así que Resend pasa a ser
+  encargado del tratamiento: hace falta su acuerdo de tratamiento de datos.
+- **Y en paralelo:** comprobar en Meta que la plantilla del aviso está
+  aprobada, con el procedimiento de `entregas/plantillas-meta.md`.
+
+### c · La cuota gratuita de Gemini → **activar la facturación antes del primer paciente de verdad**
+
+- **La cuota:** 20 peticiones al día **por modelo** (medido en F7). Cada
+  mensaje de un paciente gasta al menos una del clasificador y entre una y tres
+  del cerebro, y la ruta `/api/cron/salud` gasta una de cada modelo al día. En
+  la práctica, un puñado de mensajes al día. Luego, `429` hasta el día
+  siguiente: el bot deja de contestar.
+- **Los datos**, según las condiciones de la API de Gemini (modificadas el
+  28/04/2026): para usuarios del Espacio Económico Europeo, «the terms under
+  "How Google uses Your Data" in "Paid Services" apply to all Services,
+  including … unpaid quota», es decir, no se usan para mejorar productos. Pero
+  la misma página mantiene en lo gratuito «Do not submit sensitive,
+  confidential, or personal information to the Unpaid Services», y la tabla
+  de precios marca lo gratuito como «Content used to improve our products:
+  Yes». Con mensajes de pacientes, esa ambigüedad sobra. Pagando desaparece.
+- **El precio** (página de precios, actualizada el 24/09/2026), por millón de
+  tokens: `gemini-3.6-flash` 0,75 $ de entrada y 3,75 $ de salida **hasta el
+  31/12/2026**, y el doble desde el 1/1/2027; `gemini-3.1-flash-lite` 0,25 $
+  y 1,50 $. El coste real por conversación **no lo invento**: se mide con la
+  primera semana, porque cada mensaje guarda sus tokens (`mensajes`) y
+  `GEMINI_EUR_POR_MTOKEN_*` convierte eso en euros.
+- **Cómo:** vincular una cuenta de facturación al proyecto de Google AI Studio
+  (así se pasa al nivel 1). Los límites exactos de cada nivel solo los enseña
+  AI Studio.
+- De paso: `gemini-embedding-001` ya no aparece en la página de precios (sale
+  `gemini-embedding-2`). Hoy no se usa: la FAQ va entera en el prompt.
+
+### d · La región de las funciones → **Frankfurt (`fra1`)**
+
+- **Prueba:** `serverlessFunctionRegion: iad1` (§0.5), y la documentación de
+  Vercel (11/08/2026): «By default, Vercel Functions execute in Washington,
+  D.C., USA (iad1) for all new projects». Nadie lo eligió.
+- **Por qué:** Supabase está en `eu-central-1` (§6). Hoy cada consulta del bot
+  cruza el Atlántico dos veces y los mensajes de los pacientes se procesan en
+  Estados Unidos, justo lo contrario de «región EU por el RGPD».
+- **Cómo:** una línea en `vercel.json` (`"regions": ["fra1"]`), que entra en
+  un PR y se publica al fusionar. El plan Pro lo permite. Se comprueba después
+  con la cabecera `X-Vercel-Id`, que tiene que decir `fra1` donde hoy dice
+  `iad1`.
+
+### e · El registro abierto de Auth → **apagarlo**
+
+- **Prueba:** «Allow new users to sign up: activado» (lo miraste tú, §3.8).
+- **Por qué:** los usuarios del panel los crea `pnpm alta` con la API de
+  administración, que no necesita el registro público. Abierto, cualquiera con
+  la clave anónima puede crearse una cuenta. No vería nada, porque la RLS no le
+  da ni `rol` ni `clinica_id`, pero es una puerta que no hace falta.
+- **Cómo:** en Supabase de producción, Authentication → desactivar «Allow new
+  users to sign up». No afecta a entrar con contraseña ni a los enlaces de
+  recuperación. Lo haces tú en el panel; no pasa por el código.
 
 ---
 
@@ -801,6 +875,63 @@ F8 cerró en `1031 passed | 36 skipped (1067)`. Las 39 nuevas: 13 de
 
 `04-interruptor.spec.ts:189` salió verde otra vez. Sigue sin explicación y
 sigue abierto (pendiente 4): nada de esta fase toca el panel.
+
+### 9.7 · El CI del PR #2, y lo que solo podía verse ahí
+
+Run 36468873972 (commit `ca04acd`):
+
+```
+comprobaciones-estaticas  success
+auditoria-de-fuga         success
+pruebas-vivas             failure
+      Tests  10 failed | 1060 passed | 36 skipped (1106)
+  02-provisionales ×3 · 03-purga ×7   <- solo las que lanzan SQL
+  05-retencion y rls/03: VERDES       <- el daño colateral, resuelto también en CI
+  Error: La CLI no ha devuelto JSON. Salida:
+  ┌───┐
+  │ n │
+  ├───┤
+  │ 1 │
+  └───┘
+```
+
+Lo que dice de verdad: el secreto `SUPABASE_DB_URL_DEV` está, la guarda lo ha
+dejado pasar (es del mismo proyecto que `SUPABASE_URL_DEV`), **la conexión
+funciona y el SQL corre**. Lo que falla es leer la respuesta: la CLI contestó
+con una **tabla**.
+
+**La causa, medida:** la CLI cambia de formato según quién la lance. La misma
+consulta, contra desarrollo:
+
+```
+como en CI (--agent no), sin formato       -> tabla  (│ 1 │ postgres │)
+como en CI (--agent no) + --output-format json -> [ { "n": 1, "usuario": "postgres" } ]
+aqui (detecta un agente) + --output-format json -> { "boundary": …, "rows": [ … ], "warning": … }
+```
+
+Esta ayuda funcionaba en local desde F1 **porque la CLI detectaba que la
+lanzaba un agente** y contestaba en JSON por su cuenta. En CI nadie lo había
+visto porque hasta hoy no llegaba ni a conectar. Es otra forma de «verde por
+el entorno»: la prueba pasaba por quién la lanzaba, no por lo que medía.
+
+**El arreglo:** `--agent no --output-format json`, fijados, y
+`filasDeLaSalida()` lee la lista (y la forma `{ rows }`, por si acaso). Una
+tabla, o un JSON que no son filas, es un **error**, nunca una lista vacía.
+Cuatro pruebas de nivel 1 nuevas con las tres formas medidas.
+
+```
+ROJO · sin --output-format json (con --agent no, como el CI), 02-provisionales:
+      Tests  3 failed | 1 passed (4)
+Error: No se ha podido leer la respuesta de la CLI (no hay JSON en la salida).
+¿ha vuelto byte a byte? si
+VERDE · con el arreglo, 02 + 03 + 06 contra desarrollo:  Tests  17 passed (17)
+
+$ pnpm test   (19:10:47 UTC)   Tests  1074 passed | 36 skipped (1110)
+$ pnpm test   (19:13:44 UTC)   Tests  1074 passed | 36 skipped (1110)
+```
+
+De paso, confirmado por `--db-url` y con la CLI en modo CI: `current_user` es
+`postgres`.
 
 ---
 

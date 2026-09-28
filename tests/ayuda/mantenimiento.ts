@@ -53,6 +53,20 @@
  * --linked`: npm se comió el `--linked`, la CLI se fue a una base local que no
  * existe y el comando que tenía que restaurar la RLS no llegó nunca. Sin
  * gestor de paquetes ni shell de por medio, no hay nadie que se coma nada.
+ *
+ * ================ EL FORMATO, FIJADO: `--agent no --output-format json` ================
+ *
+ * La CLI cambia de formato según QUIÉN la lance, y lo hace sola. Medido el
+ * 28/09 con la misma consulta (ESTADO_F9 §9.7):
+ *
+ *   en CI (sin agente), sin formato   -> una TABLA de texto
+ *   en CI + --output-format json       -> una lista JSON: [ {...} ]
+ *   lanzada por un agente + json       -> { boundary, rows, warning }
+ *
+ * Esta ayuda funcionó en local desde F1 porque la CLI detectaba que la
+ * lanzaba un agente y contestaba en JSON; en CI, el primer día que llegó a
+ * conectar, contestó con la tabla («La CLI no ha devuelto JSON»). Se fijan las
+ * dos cosas para que la salida sea la misma en todas partes, y se lee la lista.
  */
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -65,8 +79,21 @@ import {
   refDeUrlSupabase,
 } from './entorno'
 
-/** Lo que devuelve la CLI: a veces un preámbulo en texto y después el JSON. */
-type Respuesta = { rows?: unknown[] }
+/**
+ * Las filas que devuelve la CLI con `--agent no --output-format json`: una
+ * lista. Se admite también la forma `{ rows }` de cuando la lanza un agente,
+ * por si algún día deja de hacer caso a `--agent no`; cualquier otra cosa es un
+ * error, no una lista vacía.
+ */
+export function filasDeLaSalida(salida: string): unknown[] {
+  const empieza = salida.search(/[[{]/)
+  if (empieza < 0) throw new Error('no hay JSON en la salida')
+  const leido: unknown = JSON.parse(salida.slice(empieza))
+  if (Array.isArray(leido)) return leido
+  const filas = (leido as { rows?: unknown }).rows
+  if (Array.isArray(filas)) return filas
+  throw new Error('el JSON no es una lista de filas')
+}
 
 const CLI = join(process.cwd(), 'node_modules', 'supabase', 'dist', 'supabase.js')
 
@@ -150,11 +177,11 @@ export function consultaDeMantenimiento(sql: string): unknown[] {
 
   let salida: string
   try {
-    salida = execFileSync(process.execPath, [CLI, 'db', 'query', '--db-url', cadena, sql], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      timeout: 120_000,
-    })
+    salida = execFileSync(
+      process.execPath,
+      [CLI, 'db', 'query', '--agent', 'no', '--output-format', 'json', '--db-url', cadena, sql],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 120_000 },
+    )
   } catch (fallo) {
     const f = fallo as { stderr?: string; stdout?: string; message?: string }
     throw new Error(
@@ -162,19 +189,16 @@ export function consultaDeMantenimiento(sql: string): unknown[] {
     )
   }
 
-  const abre = salida.indexOf('{')
-  if (abre < 0) {
-    throw new Error(tapar(`La CLI no ha devuelto JSON. Salida:\n${salida}`, cadena))
-  }
-
-  let leido: Respuesta
   try {
-    leido = JSON.parse(salida.slice(abre)) as Respuesta
-  } catch {
-    throw new Error(tapar(`No se ha podido leer la respuesta de la CLI:\n${salida.slice(abre)}`, cadena))
+    return filasDeLaSalida(salida)
+  } catch (fallo) {
+    throw new Error(
+      tapar(
+        `No se ha podido leer la respuesta de la CLI (${fallo instanceof Error ? fallo.message : String(fallo)}). Salida:\n${salida}`,
+        cadena,
+      ),
+    )
   }
-
-  return leido.rows ?? []
 }
 
 /** Libera las provisionales caducadas, como hace `pg_cron` cada cinco minutos. */
