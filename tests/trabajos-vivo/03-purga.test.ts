@@ -29,6 +29,19 @@
  * Así que se planta lo viejo y se llama con los plazos REALES (90 y 7). Lo
  * recién sembrado no los cumple y sobrevive, y además se comprueba que
  * sobrevive: sin esa mitad, un `delete from mensajes` sin `where` pasaría.
+ *
+ * ============ NI UNA FILA DENTRO DE LO SEMBRADO (F9) ============
+ *
+ * Hasta F8, «un mensaje viejo en una conversación VIVA» metía su mensaje de
+ * hace 120 días en `s.conversacionA`, la conversación sembrada, y confiaba en
+ * que la purga se lo llevara. El 27/09 la purga no pudo correr en CI y el
+ * mensaje se quedó: `05-retencion` contestó 500 y `rls/03` vio un mensaje de
+ * más de la clínica A. Cuatro rojos en dos archivos ajenos, con una causa que
+ * estaba aquí (ESTADO_F9 §0.3).
+ *
+ * Ahora cada prueba planta lo suyo en conversaciones SUYAS, apunta cada id, y
+ * `afterEach` lo borra por id pase lo que pase. Por id y solo por id: la
+ * limpieza que borraba por teléfono y motivo se llevó el fixture en F6.
  */
 import { afterEach, beforeAll, expect, it } from 'vitest'
 
@@ -44,6 +57,7 @@ describeVivo('la purga de 90 dias', () => {
 
   const conversaciones: string[] = []
   const eventos: number[] = []
+  const escalados: string[] = []
 
   beforeAll(() => {
     s = sembrado()
@@ -51,6 +65,10 @@ describeVivo('la purga de 90 dias', () => {
 
   afterEach(async () => {
     const db = clienteServicio()
+    if (escalados.length > 0) {
+      await db.from('escalados').delete().in('id', escalados)
+      escalados.length = 0
+    }
     if (conversaciones.length > 0) {
       await db.from('conversaciones').delete().in('id', conversaciones)
       conversaciones.length = 0
@@ -98,6 +116,31 @@ describeVivo('la purga de 90 dias', () => {
     return { conversacion, mensaje: Number((msj as { id: number }).id) }
   }
 
+  /**
+   * Una conversación ABIERTA y activa hoy, de esta prueba y no de la siembra.
+   *
+   * Otro teléfono que el de la sembrada: solo puede haber una conversación
+   * abierta por número y clínica (`conversaciones_abierta_unica_idx`).
+   */
+  async function conversacionViva(): Promise<string> {
+    const ahora = new Date().toISOString()
+    const { data, error } = await clienteServicio()
+      .from('conversaciones')
+      .insert({
+        clinica_id: s.clinicaA,
+        telefono_e164: '+34600999777',
+        estado: 'abierta',
+        iniciada_en: ahora,
+        ultima_actividad: ahora,
+      } as never)
+      .select('id')
+      .single()
+    if (error) throw new Error(`Sembrando la conversacion viva: ${error.message}`)
+    const id = (data as { id: string }).id
+    conversaciones.push(id)
+    return id
+  }
+
   async function existe(tabla: 'conversaciones' | 'mensajes', id: string | number): Promise<boolean> {
     const { count } = await clienteServicio()
       .from(tabla)
@@ -143,12 +186,16 @@ describeVivo('la purga de 90 dias', () => {
   it('un mensaje viejo en una conversacion VIVA tambien se va: el plazo es del mensaje', async () => {
     // Una conversación activa hoy puede arrastrar mensajes de hace cuatro
     // meses, y esos también caducan. Es el paso 2 de la función.
-    const db = clienteServicio()
-    const { data, error } = await db
+    //
+    // La conversación es de esta prueba, no la sembrada: si la purga no llega
+    // a correr, el mensaje se va con ella en `afterEach` y no se queda
+    // estorbando a `05-retencion` ni a `rls/03` (ver la cabecera).
+    const viva = await conversacionViva()
+    const { data, error } = await clienteServicio()
       .from('mensajes')
       .insert({
         clinica_id: s.clinicaA,
-        conversacion_id: s.conversacionA,
+        conversacion_id: viva,
         rol: 'paciente',
         texto: 'esto lo escribi hace cuatro meses',
         creado_en: new Date(Date.now() - 120 * DIA).toISOString(),
@@ -164,7 +211,10 @@ describeVivo('la purga de 90 dias', () => {
 
     expect(await existe('mensajes', id)).toBe(false)
     // Su conversación, que está viva, sigue ahí.
-    expect(await existe('conversaciones', s.conversacionA)).toBe(true)
+    expect(
+      await existe('conversaciones', viva),
+      'La purga se ha llevado una conversación activa hoy por un mensaje viejo suyo.',
+    ).toBe(true)
   })
 
   it('`escalados` SOBREVIVE, con conversacion_id y mensaje_id en NULL', async () => {
@@ -189,6 +239,7 @@ describeVivo('la purga de 90 dias', () => {
       .single()
     if (error) throw new Error(`Sembrando el escalado: ${error.message}`)
     const escalado = (data as { id: string }).id
+    escalados.push(escalado)
 
     purgarHistorial(90, 7)
 
@@ -215,8 +266,8 @@ describeVivo('la purga de 90 dias', () => {
     // único momento en que se notaría, que es después de purgar.
     expect(fila.motivo).toBe('urgencia_grave')
     expect(fila.asunto).toBe('urgencia')
-
-    await db.from('escalados').delete().eq('id', escalado)
+    // El borrado va en `afterEach`, por id: aquí no se llegaba si una de las
+    // aserciones de arriba fallaba, y el escalado se quedaba en la clínica A.
   })
 
   it('la carga cruda de Meta se VACIA a los 7 dias, y la fila se queda', async () => {
@@ -270,6 +321,10 @@ describeVivo('la purga de 90 dias', () => {
       .single()
     if (error) throw new Error(`Sembrando el evento viejo: ${error.message}`)
     const id = Number((data as { id: number }).id)
+    // Se apunta aunque la purga tenga que llevársela. Hasta F9 no se apuntaba,
+    // y con la purga rota esta fila de hace 100 días se quedaba en la clínica
+    // A y ponía rojo `05-retencion` (ESTADO_F9 §9.5).
+    eventos.push(id)
 
     purgarHistorial(90, 7)
 
@@ -296,5 +351,15 @@ describeVivo('la purga de 90 dias', () => {
     expect(porNombre.get('purgar-historial-90-dias')?.active).toBe(true)
     expect(porNombre.get('liberar-provisionales-caducadas')?.schedule).toBe('*/5 * * * *')
     expect(porNombre.get('liberar-provisionales-caducadas')?.active).toBe(true)
+  })
+
+  it('el SQL de mantenimiento corre como `postgres`, que es como lo corre pg_cron', async () => {
+    // Todo lo de arriba vale porque la purga se ejecuta con los privilegios del
+    // job de verdad. En F1 lo aseguraba `--linked`; desde F9 va por
+    // `--db-url` (tests/ayuda/mantenimiento.ts) y la afirmación deja de ser un
+    // comentario: si la cadena entrara con otro rol, esto se pone rojo.
+    const { consultaDeMantenimiento } = await import('../ayuda/mantenimiento')
+    const filas = consultaDeMantenimiento('select current_user as usuario') as { usuario: string }[]
+    expect(filas[0]?.usuario).toBe('postgres')
   })
 })

@@ -196,8 +196,18 @@ jobs:
       # La siembra crea cuatro usuarios con una contrasena que esta escrita en
       # el repositorio y, al limpiar, borra clinicas en cascada.
       # `exigirBaseDeDesarrollo` se niega a sembrar si encuentra pacientes o
-      # citas que no sean de las clinicas de prueba, pero el primer cerrojo es
-      # no poner aqui el secreto de produccion.
+      # citas que no sean de las clinicas de prueba, y desde F9 se niega
+      # ademas, antes de mandar nada, si la URL es la de produccion
+      # (`REFS_DE_PRODUCCION` en tests/ayuda/entorno.ts). Pero el primer
+      # cerrojo sigue siendo no poner aqui el secreto de produccion.
+      #
+      # SUPABASE_DB_URL_DEV (F9): la cadena «Session pooler» del proyecto de
+      # desarrollo. La usan `trabajos-vivo/02` y `03` para correr como
+      # `postgres` las funciones de mantenimiento, que PostgREST no publica.
+      # Hasta F8 iban con `supabase db query --linked`, que aqui no tenia ni
+      # proyecto vinculado ni token: 13 rojos el 27/09 (ESTADO_F9 §0.3). Tiene
+      # que ser del MISMO proyecto que SUPABASE_URL_DEV; si no, esas pruebas se
+      # niegan a lanzar el SQL.
       - name: Preparar el entorno
         run: |
           cat > .env.local <<'EOF'
@@ -205,6 +215,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY_DEV }}
           SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY_DEV }}
           SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET_DEV }}
+          SUPABASE_DB_URL_DEV=${{ secrets.SUPABASE_DB_URL_DEV }}
           EOF
 
       - name: Tipos de las rutas

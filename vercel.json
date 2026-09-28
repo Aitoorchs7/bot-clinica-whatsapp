@@ -3,6 +3,7 @@
   "crons": [
     { "path": "/api/cron/recordatorios", "schedule": "0 * * * *" },
     { "path": "/api/cron/retencion", "schedule": "30 4 * * *" },
-    { "path": "/api/cron/salud", "schedule": "0 6 * * *" }
+    { "path": "/api/cron/salud", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/clinicas", "schedule": "15 6 * * *" }
   ]
 }

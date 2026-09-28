@@ -14,7 +14,7 @@
 // prompt distinto del que se siembra en produccion: seria comprobar otra cosa.
 import { filasParaClinica } from '../../scripts/bloques-a-filas.mjs'
 
-import { MARCADOR } from './entorno'
+import { MARCADOR, URL_SUPABASE, exigirQueNoSeaProduccion } from './entorno'
 import { clienteServicio } from './clientes'
 
 export const CONTRASENA = 'prueba-rls-2026-Aa!'
@@ -143,6 +143,9 @@ async function exigirBaseDeDesarrollo(db: Cliente): Promise<void> {
 }
 
 export async function limpiar(): Promise<void> {
+  // Antes que nada: limpiar es borrar clinicas en cascada. El cerrojo va antes
+  // de crear el cliente, para que contra produccion no salga ni una peticion.
+  exigirQueNoSeaProduccion(URL_SUPABASE, 'La limpieza de las pruebas')
   const db = clienteServicio()
 
   // Borrar la clinica arrastra en cascada todo lo suyo.
@@ -159,6 +162,10 @@ export async function limpiar(): Promise<void> {
 }
 
 export async function sembrar(): Promise<Sembrado> {
+  // Dos cerrojos, y en este orden. El primero reconoce produccion por su nombre
+  // y no manda nada; el segundo, por lo que tiene dentro. Una produccion recien
+  // creada no tiene pacientes ni citas y solo la para el primero (ESTADO_F9 §1).
+  exigirQueNoSeaProduccion(URL_SUPABASE, 'La siembra de las pruebas')
   const db = clienteServicio()
   await exigirBaseDeDesarrollo(db)
   await limpiar()

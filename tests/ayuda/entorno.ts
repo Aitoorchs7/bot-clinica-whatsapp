@@ -32,6 +32,74 @@ export const HAY_BASE_DE_DATOS = Boolean(
   URL_SUPABASE && CLAVE_ANON && CLAVE_SERVICIO && SECRETO_JWT,
 )
 
+// ---------------------------------------------------------------------------
+// Producción: las pruebas no la tocan, y no por prudencia sino por cerrojo
+// ---------------------------------------------------------------------------
+
+/**
+ * Los proyectos de Supabase contra los que las pruebas NO pueden correr.
+ *
+ * `exigirBaseDeDesarrollo()` (siembra.ts) reconoce producción por lo que tiene
+ * dentro: pacientes o citas que no son de las clínicas de prueba. Una
+ * producción recién creada no tiene ninguno, así que pasaba por desarrollo
+ * —con su siembra de usuarios con contraseña pública y su limpieza en
+ * cascada— (ESTADO_F9 §1). Esto la reconoce por su NOMBRE, y antes de mandar
+ * una sola petición.
+ *
+ * La referencia no es un secreto: es el subdominio de la URL del proyecto.
+ */
+export const REFS_DE_PRODUCCION: readonly string[] = ['hzanffqxlpcorrucanxd']
+
+/** La referencia de un proyecto por su URL: `https://<ref>.supabase.co`. */
+export function refDeUrlSupabase(url: string): string | null {
+  try {
+    return /^([a-z0-9]{20})\.supabase\.co$/.exec(new URL(url).hostname)?.[1] ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
+ * La referencia de un proyecto por su cadena de conexión: el usuario
+ * `postgres.<ref>` del pooler, o el host `db.<ref>.supabase.co` de la conexión
+ * directa. Cualquier otra forma devuelve null, y quien la use se tiene que
+ * negar: una cadena de la que no se sabe el proyecto no se usa.
+ */
+export function refDeCadenaDeConexion(cadena: string): string | null {
+  try {
+    const url = new URL(cadena)
+    return (
+      /^postgres\.([a-z0-9]{20})$/.exec(decodeURIComponent(url.username))?.[1] ??
+      /^db\.([a-z0-9]{20})\.supabase\.co$/.exec(url.hostname)?.[1] ??
+      null
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Lanza si `url` es la de un proyecto de producción.
+ *
+ * No hay variable que lo desactive, tampoco `SIEMBRA_FORZAR`: aquella existe
+ * para cuando el contenido engaña, y esto no mira el contenido.
+ */
+export function exigirQueNoSeaProduccion(url: string, que: string): void {
+  const ref = refDeUrlSupabase(url)
+  if (ref === null || !REFS_DE_PRODUCCION.includes(ref)) return
+
+  throw new Error(
+    [
+      `${que} se ha negado: NEXT_PUBLIC_SUPABASE_URL es la de PRODUCCIÓN (${ref}).`,
+      '',
+      'Las pruebas siembran usuarios con una contraseña escrita en el repositorio',
+      'y, al limpiar, borran clínicas en cascada. No se ha mandado ninguna petición.',
+      'Revisa NEXT_PUBLIC_SUPABASE_URL en .env.local: tiene que ser el proyecto',
+      'de desarrollo.',
+    ].join('\n'),
+  )
+}
+
 export function avisarSiNoHayBaseDeDatos() {
   if (HAY_BASE_DE_DATOS) return
   console.warn(
