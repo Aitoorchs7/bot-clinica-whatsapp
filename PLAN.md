@@ -640,6 +640,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
 3. **⚠️ Las funciones de Vercel corren en `iad1` (Washington)**, con Supabase en
    Frankfurt: los mensajes de los pacientes se procesan en Estados Unidos y cada
    consulta cruza el Atlántico. Decisión del punto 5 de F9.
+   🟡 Decidido el 29/09: Frankfurt (`"regions": ["fra1"]` en `vercel.json`,
+   PR #2). Se cierra al verlo en `X-Vercel-Id` después de publicar. Y
+   `SUPABASE_SERVICE_ROLE_KEY`, quitada de Vercel por una persona.
 4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
    28/09). Decisión del punto 5 de F9.
 5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y

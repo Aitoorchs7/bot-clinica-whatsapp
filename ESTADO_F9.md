@@ -413,6 +413,16 @@ entra con las claves y con el secreto JWT.
 Escrito el 28/09 con la documentación leída ese día. Ninguna está tomada:
 cada una espera tu respuesta.
 
+> **Respuestas (29/09):** a · **quitada por ti** de Vercel, comprobado por la
+> API (quedan 12 variables, ninguna es `SUPABASE_SERVICE_ROLE_KEY`); sale de
+> verdad del sitio con la próxima publicación, porque la que sirve hoy
+> (`dpl_2WbG…`) se publicó antes. d · **Frankfurt**: `"regions": ["fra1"]` en
+> `vercel.json`, en el PR #2 (`fra1` es `eu-central-1`, la misma región de
+> AWS que Supabase, según la lista de regiones de Vercel del 11/08/2026;
+> ninguna ruta fija la suya con `preferredRegion`, así que manda
+> `vercel.json`). Se comprueba después de publicar con `X-Vercel-Id`.
+> b, c y e: pendientes.
+
 ### a · `SUPABASE_SERVICE_ROLE_KEY` en las variables de producción → **quitarla**
 
 - **Prueba:** nada de `src/` la lee (`grep -rn "SERVICE_ROLE\|service_role"
@@ -1041,6 +1051,8 @@ sola cada día a las 06:15 UTC.
     Supabase retira las claves heredadas a finales de 2026 (§3.4). Nuevo en F9.
     Fuera de esta fase: toca `bot.ts`.
 14. **⚠️ Las funciones corren en `iad1`** (§3.3). Nuevo en F9. Punto 5.
+    🟡 Decidido el 29/09: `fra1`, en el PR #2. Se cierra al ver `fra1` en
+    `X-Vercel-Id` después de publicar.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
     28/09). Nuevo en F9. Punto 5.
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
