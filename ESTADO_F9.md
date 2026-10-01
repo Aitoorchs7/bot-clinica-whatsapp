@@ -6,7 +6,9 @@
 > canal— comprobada por separado y en ese orden, y con el CI midiendo lo que
 > dice medir.
 
-Fecha: 27/09/2026 · Rama `f9-publicacion`, desde `origin/main` (`79fd601`)
+Fecha: 27/09/2026 · Rama `f9-publicacion`, desde `origin/main` (`79fd601`) ·
+fusionada en `main` como `aaefe04` el 01/10 · el cierre sigue en `f9-cierre`,
+desde `aaefe04`
 
 > ⚠️ **Al abrir la fase no se ha tocado producción.** Todo lo que hay hasta §4
 > es lectura: el repositorio, el CI, la documentación y lo que el sitio
@@ -250,8 +252,8 @@ aparezca no demuestra que no pasara.
 | 2 | El secreto JWT | 🟡 **Medio:** el proyecto sigue usando el secreto heredado (§3.4). Falta ver «aceptado» con el valor de Vercel: punto 6 |
 | 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). Faltan: la clínica en el mapa y en la base (punto 6), y **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
-| 5 | Tus decisiones | ⏳ La recomendación, en §5 al llegar |
-| 6 | La ruta de salud | 🟡 **Hecha**: niveles 1 y 2 en verde (§10). Falta **publicarla, que es tocar producción**, y preguntarle al sitio |
+| 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
+| 6 | La ruta de salud | 🟡 **Publicada** con la fusión del PR #2 (`aaefe04`, 01/10, la hiciste tú): existe en producción y su cerrojo contesta 401 (§11.2). Falta lanzarla allí, con tu «sí» |
 
 ---
 
@@ -421,7 +423,14 @@ cada una espera tu respuesta.
 > AWS que Supabase, según la lista de regiones de Vercel del 11/08/2026;
 > ninguna ruta fija la suya con `preferredRegion`, así que manda
 > `vercel.json`). Se comprueba después de publicar con `X-Vercel-Id`.
-> b, c y e: pendientes.
+> b y e: pendientes. c · **facturación vinculada**, según tú (01/10): la clave
+> de la API en AI Studio enseña «My Billing Account». No lo he podido ver yo:
+> se dará por comprobado cuando el bot conteste más de lo que permite la cuota
+> gratuita sin un `429`.
+>
+> **Después de la fusión (01/10):** a y d, vistas en el despliegue que sirve
+> (§11): `fra1` en la cabecera de dos rutas de función, y un despliegue
+> posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`.
 
 ### a · `SUPABASE_SERVICE_ROLE_KEY` en las variables de producción → **quitarla**
 
@@ -669,6 +678,30 @@ Sin el control, el cero sería el verde que no ha mirado nada.
   ningún «Hola» real llegaría al bot, ni siquiera desde tu móvil. Publicar la
   app es un paso nuevo, manual y de producción.
 - `messages`: **Suscrito** (lo miraste tú el 28/09).
+- El número del bot es **el de prueba de Meta**, `+1 (555) 185-0806` (01/10).
+  Con un número de prueba, WhatsApp solo entrega a los destinatarios de su
+  lista (WhatsApp → Configuración de la API → «Para»), así que la prueba de
+  punta a punta exige tener tu móvil en esa lista.
+- **No hay ninguna clínica todavía, ni empresa** (01/10). Para probar, una
+  clínica de prueba con datos inventados. Para publicar la app, Meta pide una
+  política de privacidad, y alguien tiene que figurar como responsable: es una
+  decisión legal, aparcada hasta que se vaya a publicar.
+
+### 7.5 · Probar el canal sin publicar la app de Meta
+
+Mientras la app no esté publicada, Meta no entrega mensajes reales, ni de los
+administradores (§7.2). Lo que sí se puede probar, de menos a más:
+
+1. ✅ La conexión con Meta: URL verificada y firma de la app (§7.3–7.4).
+2. Lo que conoce producción: la ruta de salud, en cuanto se publique.
+3. El bot de punta a punta: un aviso idéntico al de Meta, **firmado por
+   nosotros** con la clave secreta de la app, con el `phone_number_id` del
+   número de prueba y tu móvil como remitente. Recorre el bot entero (base,
+   Gemini, respuesta) y la respuesta sale por la API de WhatsApp a tu móvil.
+   Lo único que no prueba es que Meta entregue el mensaje. Exige una clínica
+   de prueba en producción y su par en `WHATSAPP_CLINICAS`, que tú escribas
+   antes al número (se abre la ventana de 24 h) y tu móvil en la lista de
+   destinatarios. Escribe en producción: paso a paso y con «sí».
 
 ### 7.3 · 🔴 El mensaje de prueba de Meta, rechazado por la firma
 
@@ -1010,11 +1043,108 @@ Es el punto 2 de F9 ensayado en desarrollo: con el secreto bueno, `atiende`;
 con otro, Supabase contesta **401 · «No suitable key or wrong key type»** y la
 ruta lo llama por su nombre.
 
+**Cómo lanzarla a mano (encontrado el 01/10):** la copia del CLI de Vercel
+que había en esta máquina (60.1.3, caché de `npx`) hace `vercel crons run`
+con un `POST /v1/projects/{id}/crons/run?teamId=…` y el cuerpo `{ path,
+schedule }`. Es una llamada normal de la API: si el token limitado al
+proyecto la acepta, se puede lanzar la comprobación sin conocer
+`CRON_SECRET`. **Sin probar**: hasta que se publique, la ruta no existe en
+producción.
+
 **Cómo se consultará en producción, y lo que no está comprobado:** es un cron,
 así que se puede lanzar a mano (`vercel crons run /api/cron/clinicas`, en la
 documentación de Vercel). Que esa llamada a mano lleve `CRON_SECRET` como la
 programada **no lo dice la documentación**: se verá la primera vez. Si no, pasa
 sola cada día a las 06:15 UTC.
+
+---
+
+## 11 · Después de la fusión: lo que sirve producción (01/10/2026)
+
+El PR #2 lo fusionaste tú: `aaefe04`, a las 18:04:28 UTC. `git diff --stat
+131e469 aaefe04` sale vacío: lo publicado es exactamente lo que se revisó. Todo
+lo de esta sección es lectura (la API de Vercel con tu token, y tres `GET` sin
+credencial al sitio). El CI de `main` (run 36904109929) estaba lanzando
+`pruebas-vivas` contra desarrollo mientras tanto, y por eso no se lanzó nada
+vivo.
+
+### 11.1 · El despliegue (API, ~18:10 UTC)
+
+```
+sirviendo en produccion (targets.production.id): dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+  READY · aaefe04 · rama main · creado 18:04:31Z · listo 18:05:01Z · source=git
+  alias: bot-clinica-whatsapp.vercel.app, bot-clinica-whatsapp-apolo4team.vercel.app,
+         bot-clinica-whatsapp-git-main-apolo4team.vercel.app
+  regions: fra1
+el anterior: dpl_2WbGMVsy1FxtBJNkqwpSXpD4t9Fc · READY · 79fd601 · 28/09 18:11:54Z · redeploy
+```
+
+Y desde fuera, sin la API: el HTML de `/entrar` lleva
+`data-dpl-id="dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9"`. El dominio sirve ese
+despliegue.
+
+### 11.2 · Frankfurt, visto en la función y no solo en la configuración
+
+```
+18:11:21Z GET /api/cron/clinicas          401 {"estado":"no autorizado"}
+          X-Matched-Path: /api/cron/clinicas   X-Vercel-Id: cdg1::fra1::pnlwl-1790878283675-…
+18:11:22Z GET /api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=sonda-falsa&hub.challenge=123
+          403 forbidden
+          X-Matched-Path: /api/whatsapp/webhook X-Vercel-Id: cdg1::fra1::j8pqh-1790878284347-…
+18:11:23Z GET /entrar                     200   X-Panel-Guardia: proxy
+          X-Vercel-Id: cdg1::fra1::glwpz-1790878285369-…
+```
+
+El 27/09 era `cdg1::iad1` (§0.2). `proxy.ts` deja fuera `/api` entero
+(`matcher`), así que las dos primeras respuestas las da **la propia función**:
+es la región donde se ejecuta el código del bot. El 401 dice de paso que la
+ruta nueva existe en producción y que su cerrojo está puesto.
+
+⚠️ **El proyecto sigue diciendo `serverlessFunctionRegion: iad1`.** Manda
+`vercel.json`, que fija la región en cada despliegue. Consecuencia: si alguien
+quita `"regions"` de `vercel.json`, las funciones vuelven a Washington sin
+ningún aviso. Se puede cambiar también en el panel de Vercel (Settings →
+Functions → Function Region) para que las dos digan lo mismo; es un cambio de
+producción y no lo he hecho.
+
+### 11.3 · Las cuatro crons
+
+```
+crons del despliegue dpl_GeVZ…:          crons activas del proyecto:
+  0 * * * *   /api/cron/recordatorios      deploymentId: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+  30 4 * * *  /api/cron/retencion          enabledAt 27/09 15:47:45Z · disabledAt - ·
+  0 6 * * *   /api/cron/salud              updatedAt 01/10 18:05:01Z
+  15 6 * * *  /api/cron/clinicas           (las mismas cuatro, mismos horarios)
+```
+
+Registradas y activas, y movidas al despliegue nuevo en el mismo segundo en
+que quedó listo. Que estén registradas no dice que corran: eso lo dice cada
+pasada.
+
+### 11.4 · `SUPABASE_SERVICE_ROLE_KEY`, fuera del despliegue que sirve
+
+```
+variables: 12, todas production · sensitive (nombre, entorno, tipo; sin valores)
+  27/09 15:47:20Z  WHATSAPP_PHONE_NUMBER_ID · WHATSAPP_TOKEN · WHATSAPP_VERIFY_TOKEN ·
+                   CRON_SECRET · WHATSAPP_CLINICAS · DEEPGRAM_API_KEY ·
+                   NEXT_PUBLIC_SUPABASE_URL · NEXT_PUBLIC_SUPABASE_ANON_KEY ·
+                   GOOGLE_AI_API_KEY · SUPABASE_PROJECT_REF
+  27/09 16:49:31Z  SUPABASE_JWT_SECRET
+  28/09 18:11:34Z  META_APP_SECRET
+¿SUPABASE_SERVICE_ROLE_KEY en la lista? no
+variable modificada mas tarde: 28/09 18:11:34Z · despliegue creado: 01/10 18:04:31Z · ¿posterior? si
+```
+
+**La hora exacta del borrado no se puede leer**: la lista de variables no
+guarda las borradas, y el registro de actividad da 403 con tu token, que está
+limitado al proyecto (`"You don't have permission to list the event"`, en
+`/v3/events` y en `/v1/events`). Queda acotada entre fechas: el 28/09 a las
+18:11:34 había 13 variables (§7.3), el 29/09 había 12 y ninguna era esta (§5),
+y el despliegue que sirve es del 01/10. El que servía hasta hoy, `dpl_2WbG…`
+(28/09 18:11:54Z), **es anterior al borrado**: por eso llevaba la clave dentro
+hasta esta publicación.
+
+**Decisiones a y d: cerradas.** Pendiente 14: cerrado.
 
 ---
 
@@ -1039,7 +1169,9 @@ sola cada día a las 06:15 UTC.
 7. **La cuota de Gemini son 20 peticiones al día por modelo.** Punto 5.
 8. **El horario del cron depende del plan de Vercel.** Según el traspaso, la
    cuenta es Pro y el cron de cada hora está registrado. Lo compruebo yo cuando
-   tenga el token.
+   tenga el token. 🟡 **01/10:** registrado y activo con `0 * * * *` en el
+   despliegue que sirve (§11.3); que corra cada hora lo dirá una pasada vista
+   en el registro.
 9. **F3b**, aparcada, sin cambios.
 10. **El `README.md` sigue siendo el de `create-next-app`.** Fuera de esta fase
     salvo que se pida.
@@ -1050,9 +1182,10 @@ sola cada día a las 06:15 UTC.
 13. **⚠️ El bot depende del secreto JWT heredado y de la clave `anon`**, y
     Supabase retira las claves heredadas a finales de 2026 (§3.4). Nuevo en F9.
     Fuera de esta fase: toca `bot.ts`.
-14. **⚠️ Las funciones corren en `iad1`** (§3.3). Nuevo en F9. Punto 5.
-    🟡 Decidido el 29/09: `fra1`, en el PR #2. Se cierra al ver `fra1` en
-    `X-Vercel-Id` después de publicar.
+14. ~~**⚠️ Las funciones corren en `iad1`** (§3.3).~~ ✅ **Cerrado el
+    01/10/2026**: `cdg1::fra1` en la cabecera de dos rutas de función del
+    despliegue `aaefe04` (§11.2). Queda una nota: el proyecto sigue diciendo
+    `iad1` y manda `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
     28/09). Nuevo en F9. Punto 5.
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
