@@ -1109,6 +1109,19 @@ ningún aviso. Se puede cambiar también en el panel de Vercel (Settings →
 Functions → Function Region) para que las dos digan lo mismo; es un cambio de
 producción y no lo he hecho.
 
+✅ **Cambiado con tu «sí» (01/10)**, por la API:
+
+```
+ANTES   18:38:20Z · serverlessFunctionRegion: iad1 · sirviendo: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+PATCH   18:38:21Z · OK · la respuesta dice serverlessFunctionRegion: fra1
+DESPUES 18:38:21Z · serverlessFunctionRegion: fra1 · sirviendo: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+18:38:27Z GET /api/cron/clinicas · 401 · X-Vercel-Id: cdg1::fra1::hq7pp-1790879908975-…
+```
+
+Ahora el proyecto y `vercel.json` dicen lo mismo. Solo afecta a las próximas
+publicaciones (la que sirve no ha cambiado). Se deshace con el mismo `PATCH`
+y `iad1`.
+
 ### 11.3 · Las cuatro crons
 
 ```
@@ -1308,8 +1321,8 @@ tiene que decir `supabase hzanffqxlpcorrucanxd.supabase.co`.
     Fuera de esta fase: toca `bot.ts`.
 14. ~~**⚠️ Las funciones corren en `iad1`** (§3.3).~~ ✅ **Cerrado el
     01/10/2026**: `cdg1::fra1` en la cabecera de dos rutas de función del
-    despliegue `aaefe04` (§11.2). Queda una nota: el proyecto sigue diciendo
-    `iad1` y manda `vercel.json`.
+    despliegue `aaefe04` (§11.2). Y el proyecto, también en `fra1` desde el
+    01/10 a las 18:38 UTC: ya no depende solo de `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
     28/09). Nuevo en F9. Punto 5.
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado

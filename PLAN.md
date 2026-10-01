@@ -645,8 +645,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    `SUPABASE_SERVICE_ROLE_KEY`, quitada de Vercel por una persona.
    ✅ **Cerrado el 01/10/2026**, con la fusión del PR #2 (`aaefe04`):
    `cdg1::fra1` en la cabecera de dos rutas de función, y el despliegue que
-   sirve es posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`. El proyecto
-   sigue diciendo `iad1`; manda `vercel.json`. `ESTADO_F9 §11`.
+   sirve es posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`. Y el
+   proyecto, también en `fra1` desde el 01/10 (antes decía `iad1`): ya no
+   depende solo de `vercel.json`. `ESTADO_F9 §11`.
 4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
    28/09). Decisión del punto 5 de F9.
 5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y
