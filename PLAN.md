@@ -659,6 +659,13 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    36904109929, `04-interruptor.spec.ts:87`). Falla cerrado; en producción
    sacaría a recepción a la Agenda. Fuera de F9, sin arreglar.
    `ESTADO_F9 §11.5`.
+7. **🔴 El sitio publicado habla con la Supabase de desarrollo.** La ruta de
+   salud, lanzada en producción el 01/10, dice `ggalkkeobyxpodbzlwzj`
+   (desarrollo) y `ninguna_clinica`. `NEXT_PUBLIC_SUPABASE_URL` la usan el bot,
+   el panel y el guardián. Nada escrito en desarrollo por producción (mapa
+   vacío) y ningún paciente afectado. Arreglo: las cuatro variables de
+   Supabase de Vercel con los valores de producción, y volver a publicar.
+   Bloquea los puntos 2 y 3 de F9. `ESTADO_F9 §11.6`.
 
 ### Infraestructura
 
