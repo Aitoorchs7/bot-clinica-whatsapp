@@ -26,10 +26,19 @@ const SECRETO = 'cron-secreto-de-prueba'
 
 const { GET: recordatorios } = await import('@/app/api/cron/recordatorios/route')
 const { GET: retencion } = await import('@/app/api/cron/retencion/route')
+const { GET: clinicas } = await import('@/app/api/cron/clinicas/route')
 
+/**
+ * La ruta, y lo que tiene que contestar CON el secreto y el mapa vacío.
+ *
+ * `clinicas` (F9) contesta 500 y no 200, y es a propósito: un despliegue que no
+ * conoce ninguna clínica no está «al día», no atiende a nadie. Las otras dos
+ * con cero clínicas no tienen nada que hacer, y lo hacen bien.
+ */
 const RUTAS = [
-  ['recordatorios', recordatorios],
-  ['retencion', retencion],
+  ['recordatorios', recordatorios, 200],
+  ['retencion', retencion, 200],
+  ['clinicas', clinicas, 500],
 ] as const
 
 let peticiones: number
@@ -58,7 +67,7 @@ function pedir(ruta: (p: Request) => Promise<Response>, cabeceras: Record<string
   return ruta(new Request('https://ejemplo.test/api/cron/x', { headers: cabeceras }))
 }
 
-describe.each(RUTAS)('/api/cron/%s · el cerrojo', (nombre, ruta) => {
+describe.each(RUTAS)('/api/cron/%s · el cerrojo', (nombre, ruta, conElSecreto) => {
   it('sin cabecera: 401, y NO se ejecuta nada', async () => {
     const respuesta = await pedir(ruta, {})
 
@@ -83,12 +92,12 @@ describe.each(RUTAS)('/api/cron/%s · el cerrojo', (nombre, ruta) => {
     expect(peticiones).toBe(0)
   })
 
-  it('LA PAREJA: con el secreto, 200 (si no, las de arriba pasarian con la ruta rota)', async () => {
+  it('LA PAREJA: con el secreto, la ruta se abre (si no, las de arriba pasarian con la ruta rota)', async () => {
     // Sin esta, una ruta que devolviera 401 SIEMPRE —por ejemplo, con el
     // secreto mal leído del entorno— pasaría las tres anteriores y nadie
     // recibiría jamás un recordatorio.
     const respuesta = await pedir(ruta, { authorization: `Bearer ${SECRETO}` })
-    expect(respuesta.status).toBe(200)
+    expect(respuesta.status).toBe(conElSecreto)
   })
 
   it('SIN CRON_SECRET EN EL ENTORNO NO SE ABRE LA PUERTA, se cierra del todo', async () => {

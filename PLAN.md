@@ -237,6 +237,7 @@ solo a todo archivo que use el cliente del bot.
 | **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ✅ Cerrada |
 | **F7** | La suite de conjunto: barandilla 4, quince guiones y CI | ✅ Cerrada |
 | **F8** | `alta-clinica` y la entrega al cliente | ✅ Cerrada |
+| **F9** | Publicación: esquema, secreto y canal en producción, y el CI entero | 🔄 En curso |
 
 ### F1 · Base de datos y RLS
 
@@ -374,6 +375,27 @@ los datos de esa clínica, con un canario sembrado y retirado en la misma orden.
 
 Ver `ESTADO_F8`.
 
+### F9 · Publicación
+
+El panel se publicó con el merge de F1–F8 (`79fd601`, 27/09/2026). **Publicar
+el panel no es publicar el bot**: F9 termina cuando un mensaje de WhatsApp real
+recibe respuesta en producción, con cada pieza comprobada por separado y en
+orden. Son seis puntos: el esquema de la base de producción (las diez
+migraciones, la 010 la primera que importa), el secreto JWT con el que firma el
+bot, el canal de punta a punta, el hueco del CI (`pruebas-vivas`), las
+decisiones de producto que quedan (credenciales sin uso, correo, cuota de
+Gemini) y una ruta de salud que diga qué clínicas conoce el despliegue.
+
+Dos reglas que nacen aquí:
+
+- **A producción se llega con `--db-url`, nunca con `supabase link`.** Las
+  pruebas lanzan SQL como `postgres` contra el proyecto vinculado; vincular
+  producción «para mirar» dejaría `pnpm test` purgando su historial.
+- **Cada paso que toca producción espera un «sí» explícito**: la base, las
+  variables de Vercel, Meta, y fusionar en `main`, que publica.
+
+Ver `ESTADO_F9`.
+
 ---
 
 ## 8 · Cómo se trabaja
@@ -460,10 +482,10 @@ lo pide **dos veces**:
 
 ## 11 · Pendientes vivos
 
-> **Esta lista tiene dos copias: aquí y en `ESTADO_F6 §8`.** Es deliberado: con
-> F1 casi se pierde un pendiente porque vivía solo en su `ESTADO_*.md`, y eso
-> depende de que alguien se acuerde de releerlo. **Si se toca una, se toca la
-> otra.**
+> **Esta lista tiene dos copias: aquí y en el `ESTADO_*.md` de la fase en
+> curso, hoy `ESTADO_F9 §8`.** Es deliberado: con F1 casi se pierde un
+> pendiente porque vivía solo en su `ESTADO_*.md`, y eso depende de que alguien
+> se acuerde de releerlo. **Si se toca una, se toca la otra.**
 
 ### Cerrado en F6 · La frase de `middleware.ts`, y eran seis sitios
 
@@ -560,6 +582,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    cita en la base, y se ha visto en rojo quitando el cableado.
    ⚠️ **La 010 esta aplicada en desarrollo y no en produccion** (no hay
    produccion todavia). Cuando la haya, es la primera que sube.
+   ✅ **Cerrado el 28/09/2026:** producción tiene las diez migraciones, en el
+   historial y en los objetos, y `db push --dry-run` no tiene nada que aplicar.
+   Ver `ESTADO_F9 §6`.
 4. **🟡 Un clic del interruptor deja DOS apuntes en `auditoria`.**
    `tests/e2e/04-interruptor.spec.ts:189` lo caza. Los dos con `antes: true`,
    a 2,1 s: apunta a dos envios concurrentes de la accion. **Es anterior a F7**
@@ -593,6 +618,38 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    es la primera página que ve quien abre la carpeta de código. Candidato para
    F9, que es cuando la va a abrir alguien de fuera.
 
+### Nuevo en F9
+
+> La copia viva de esta lista pasa a `ESTADO_F9` §8. **Si se toca una, se toca
+> la otra.**
+
+1. **🔴 `pruebas-vivas` en rojo por `--linked`.** 13 rojos en el CI del merge
+   (run 36334234453): nueve pruebas no pueden lanzar SQL («Cannot find project
+   ref») y cuatro son daño colateral del mensaje de hace 120 días que `03-purga`
+   deja sembrado cuando la purga no corre. Punto 4 de F9.
+   ✅ **Cerrado el 28/09** (`--db-url`, guarda de proyecto, cerrojo de
+   producción, y `03-purga` que borra lo suyo por id —había DOS filas sin
+   apuntar, no una—). Los 13 rojos, reproducidos con el orden de los archivos
+   fijado. Y el CI destapó un tercer fallo que en local no se veía: la CLI
+   contestaba en JSON solo cuando la lanzaba un agente. `pruebas-vivas`, verde
+   por primera vez: `1074 passed`. `ESTADO_F9 §9`.
+2. **⚠️ El bot depende del secreto JWT heredado y de la clave `anon`.** Supabase
+   retira las claves `anon` y `service_role` a finales de 2026 y tiene el
+   secreto heredado como «no recomendado, por compatibilidad». Fuera de F9: toca
+   `bot.ts`. Ver `ESTADO_F9 §3.4`.
+3. **⚠️ Las funciones de Vercel corren en `iad1` (Washington)**, con Supabase en
+   Frankfurt: los mensajes de los pacientes se procesan en Estados Unidos y cada
+   consulta cruza el Atlántico. Decisión del punto 5 de F9.
+   🟡 Decidido el 29/09: Frankfurt (`"regions": ["fra1"]` en `vercel.json`,
+   PR #2). Se cierra al verlo en `X-Vercel-Id` después de publicar. Y
+   `SUPABASE_SERVICE_ROLE_KEY`, quitada de Vercel por una persona.
+4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
+   28/09). Decisión del punto 5 de F9.
+5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y
+   verificado el 28/09. Pero **la app de Meta no está publicada**, y hasta que
+   lo esté Meta no entrega ningún mensaje real, ni de sus administradores.
+   Punto 3 de F9, `ESTADO_F9 §7.2`.
+
 ### Infraestructura
 
 1. ~~El CI no impide mezclar: falta marcar el check obligatorio.~~
@@ -609,6 +666,10 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    ⚠️ **F8 no los ha puesto, y no por olvido:** los cuatro valores están en
    `.env.local`, que no se lee. Ponerlos exige teclearlos, y eso lo hace una
    persona. El procedimiento exacto (`gh secret set …`), en `ESTADO_F8` §7.2.
+   ✅ **Puestos por una persona el 22/09 y el 27/09/2026**, y funcionando:
+   `auditoria-de-fuga` sale verde con `FUGA_EXIGIDA=1`. `pruebas-vivas` ya
+   corre, y se pone roja por otra causa: el SQL de mantenimiento pide un
+   proyecto vinculado que el CI no tiene («Nuevo en F9», punto 1).
 3. ~~**Las pruebas de navegador tampoco corren en CI.**~~ ✅ **Cerrado en F7.**
    `pruebas-vivas` las lleva, con `playwright install --with-deps chromium`,
    `pnpm test:e2e` y subida de trazas al fallar. No se añadieron a ciegas: se
@@ -619,6 +680,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    el horario a diario **y poner `RECORDATORIO_HORAS_ANTES=48`**; si no, las
    citas de dentro de entre 24 y 48 horas no reciben aviso. Está explicado en
    `.env.example`, que es donde alguien lo va a leer.
+   ⚪ **Según el traspaso de F9, la cuenta es Pro y el cron de cada hora está
+   registrado.** Pendiente de comprobarlo con el token de Vercel
+   (`ESTADO_F9 §0`).
 
 ### Una regla de operación que F5 amplía
 
