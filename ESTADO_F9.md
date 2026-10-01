@@ -250,11 +250,11 @@ aparezca no demuestra que no pasara.
 | # | Punto | Estado |
 |---|---|---|
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
-| 2 | El secreto JWT | 🔴 **Abierto, y con un problema anterior:** la ruta de salud dice que el sitio publicado apunta a la Supabase **de desarrollo** (§11.6). Primero, las cuatro variables de Supabase de Vercel con los valores de producción; luego, ver «aceptado» con una clínica en el mapa |
+| 2 | El secreto JWT | 🟡 **Medio.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado el 01/10, y la ruta de salud ya dice `hzanffqxlpcorrucanxd` (§11.7). Falta ver «aceptado», que comprueba a la vez la clave `anon` y el secreto: exige una clínica en el mapa (§7.5, pasos 1 y 2) |
 | 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). Faltan: la clínica en el mapa y en la base (punto 6), y **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
 | 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
-| 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10, §11.6): rojo, `ninguna_clinica`, y ha destapado que el sitio habla con la base de desarrollo. Hace lo que tenía que hacer. Se vuelve a lanzar tras el arreglo |
+| 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7) |
 
 ---
 
@@ -1283,6 +1283,58 @@ pasen por el chat): en Vercel, las cuatro variables de Supabase con los valores
 `SUPABASE_PROJECT_REF`), y volver a publicar. Después, otra vez esta ruta:
 tiene que decir `supabase hzanffqxlpcorrucanxd.supabase.co`.
 
+### 11.7 · ✅ Arreglado: el sitio ya habla con la base de producción
+
+**Las variables, cambiadas por ti** (01/10, leídas por la API sin valores):
+
+```
+ahora 19:13:49Z · total: 12
+  2026-10-01 19:11:01Z · NEXT_PUBLIC_SUPABASE_URL · production · encrypted  <- cambiada hoy
+  2026-10-01 19:11:51Z · NEXT_PUBLIC_SUPABASE_ANON_KEY · production · encrypted  <- cambiada hoy
+  2026-10-01 19:12:17Z · SUPABASE_JWT_SECRET · production · sensitive  <- cambiada hoy
+  2026-10-01 19:12:48Z · SUPABASE_PROJECT_REF · production · sensitive  <- cambiada hoy
+  (las otras ocho, sin tocar desde el 27/09 y el 28/09)
+¿estan las cuatro? 4 de 4 · ¿SUPABASE_SERVICE_ROLE_KEY? no
+```
+
+Las dos `NEXT_PUBLIC_*` han pasado de «sensitive» a «encrypted». No es un
+problema: la URL y la clave `anon` son públicas por diseño. Las dos secretas
+siguen «sensitive».
+
+**Publicado con tu «sí»**, volviendo a publicar `dpl_GeVZ…` (mismo commit),
+para que la compilación recoja las variables:
+
+```
+-- POST /v13/deployments 19:14:29 · HTTP 200 · dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw · INITIALIZING · commit aaefe04
+   19:14:35 · BUILDING
+   19:15:15 · READY
+sirviendo en produccion: dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw · creado 19:14:30Z · regions: fra1
+crons activas del proyecto -> deploymentId: dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw (las cuatro, mismos horarios)
+```
+
+**La ruta de salud, otra vez** (escucha viva antes y después):
+
+```
+-- POST crons/run 19:15:59 · HTTP 200 · {"invocationAt":1790882161026}
+   19:16:01 error GET /api/cron/clinicas -1 salud de las clinicas · ninguna_clinica · supabase hzanffqxlpcorrucanxd.supabase.co · 0 clinica(s) · WHATSAPP_CLINICAS esta vacio: este despliegue no atiende a ninguna clinica.
+   escucha viva antes: si · despues: si
+```
+
+Y desde fuera: `/` y `/panel` redirigen con la marca del guardián, y `/entrar`
+da 200 desde `cdg1::fra1` con `data-dpl-id="dpl_H1oZ…"`.
+
+Lo que queda demostrado y lo que no:
+
+- ✅ **La URL es la de producción.** Lo dice el propio despliegue.
+- ✅ Los usuarios de prueba de desarrollo ya no entran en el panel publicado:
+  el panel autentica contra el Auth de producción, que no los tiene.
+- ⚪ **La clave `anon` y el secreto JWT, sin comprobar.** Con el mapa vacío la
+  ruta no prueba el token, y una petición sin sesión no llega a usar la clave.
+  Se comprueban las dos a la vez cuando haya una clínica en el mapa: es el
+  punto 2, y pasa por los pasos 1 y 2 de §7.5.
+- ℹ️ El panel publicado no tiene usuarios hasta que se creen con el alta en
+  producción. Esperado.
+
 ---
 
 ## 8 · Pendientes vivos
@@ -1340,9 +1392,9 @@ tiene que decir `supabase hzanffqxlpcorrucanxd.supabase.co`.
     de `main` (run 36904109929, `04-interruptor.spec.ts:87`). Falla cerrado,
     así que no es de seguridad; en producción sacaría a recepción a la Agenda.
     Nuevo en F9, fuera de su alcance: arreglos propuestos, sin hacer.
-20. **🔴 El sitio publicado habla con la Supabase de desarrollo** (§11.6).
-    `NEXT_PUBLIC_SUPABASE_URL` de Vercel es `ggalkkeobyxpodbzlwzj`, y la usan
-    el bot, el panel y el guardián. Nada escrito en desarrollo por producción
-    (mapa vacío) y ningún paciente afectado. Arreglo: las cuatro variables de
-    Supabase de Vercel con los valores de producción y volver a publicar; lo
-    hace una persona. Bloquea los puntos 2 y 3. Nuevo en F9.
+20. ~~**🔴 El sitio publicado habla con la Supabase de desarrollo** (§11.6).~~
+    ✅ **Arreglado el 01/10/2026** (§11.7): las cuatro variables cambiadas por
+    ti, publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`.
+    Nada escrito en desarrollo por producción mientras duró (mapa vacío) y
+    ningún paciente afectado. La clave `anon` y el secreto se comprueban con el
+    punto 2.

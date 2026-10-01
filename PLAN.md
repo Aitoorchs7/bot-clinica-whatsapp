@@ -667,6 +667,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    vacío) y ningún paciente afectado. Arreglo: las cuatro variables de
    Supabase de Vercel con los valores de producción, y volver a publicar.
    Bloquea los puntos 2 y 3 de F9. `ESTADO_F9 §11.6`.
+   ✅ **Arreglado el 01/10/2026**: variables cambiadas por una persona,
+   publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`. La
+   clave `anon` y el secreto se comprueban con el punto 2. `ESTADO_F9 §11.7`.
 
 ### Infraestructura
 
