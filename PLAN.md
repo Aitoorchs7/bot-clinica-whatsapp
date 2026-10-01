@@ -653,6 +653,12 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    verificado el 28/09. Pero **la app de Meta no está publicada**, y hasta que
    lo esté Meta no entrega ningún mensaje real, ni de sus administradores.
    Punto 3 de F9, `ESTADO_F9 §7.2`.
+6. **🟡 El guardián tira el error de `getUser()`.** Un «no» pasajero de Auth
+   con un token válido (la misma cookie, rechazada y aceptada 0,2 s después)
+   echó a una prueba a la Agenda y puso rojo el CI de `main` (run
+   36904109929, `04-interruptor.spec.ts:87`). Falla cerrado; en producción
+   sacaría a recepción a la Agenda. Fuera de F9, sin arreglar.
+   `ESTADO_F9 §11.5`.
 
 ### Infraestructura
 

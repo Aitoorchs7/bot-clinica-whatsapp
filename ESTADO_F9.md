@@ -1146,6 +1146,65 @@ hasta esta publicación.
 
 **Decisiones a y d: cerradas.** Pendiente 14: cerrado.
 
+### 11.5 · 🔴 El CI de `main` salió rojo: un clic de navegador, y no es de F9
+
+Run 36904109929 (push de `aaefe04`):
+
+```
+comprobaciones-estaticas  success   18:04:35 → 18:06:40 UTC
+auditoria-de-fuga         success   18:04:36 → 18:06:22 UTC
+pruebas-vivas             failure   18:06:27 → 18:17:27 UTC
+   Test Files  48 passed | 3 skipped (51)
+        Tests  1074 passed | 36 skipped (1110)      <- Vitest, el mismo número que en el PR
+   ✘ 25 tests/e2e/04-interruptor.spec.ts:87:7 › apagar el interruptor ›
+        y el asistente vuelve a decirlo en cuanto se enciende (30.1s)
+        Test timeout of 30000ms exceeded.
+   1 failed · 30 passed (2.5m)                      <- Playwright
+```
+
+El árbol de `aaefe04` es idéntico al de `131e469`, que pasó entero en el PR
+(run 36600187683). La misma prueba, con el mismo código, verde allí y roja
+aquí. Antes de llamarlo «inestable», la traza que sube el CI
+(`playwright-trazas`):
+
+```
+pasos de la prueba (segundos desde el inicio)
+  2.48  entrarComo() termina: la URL ya es /panel
+  2.48  Navigate /panel/conocimiento  ->  termina bien a los 3.84
+  3.84  Click «encender-publico»      ->  espera 26 s a un boton que no aparece
+  foto del fallo: la AGENDA (/panel), no /panel/conocimiento
+
+peticiones de documento, con la cookie de sesion comparada por su huella SHA-256
+  18:16:20.906 POST /entrar                  200  set-cookie sb-…-auth-token  huella 56a6c088d76c
+  18:16:21.992 GET  /panel/conocimiento      307 -> /entrar?desde=…          huella 56a6c088d76c
+  18:16:22.216 GET  /entrar?desde=…          307 -> /panel                   huella 56a6c088d76c
+  18:16:22.449 GET  /panel                   200                             huella 56a6c088d76c
+```
+
+**El mismo token, rechazado por el guardián y aceptado 0,2 s después.** No es
+una carrera de la prueba con la cookie (el navegador ya la mandaba): es
+`supabase.auth.getUser()` diciendo «no» una vez, un segundo después de entrar,
+contra el Auth de desarrollo. Y `proxy.ts` no mira el `error` de `getUser()`:
+cualquier fallo de Auth se trata como «no hay sesión». Por eso no se puede
+saber qué contestó Auth exactamente; el servidor de la prueba no escribió nada.
+
+Lo que significa:
+
+- **Para la seguridad, nada malo.** El guardián falla cerrado, que es lo que
+  tiene que hacer.
+- **Para una persona de recepción, en producción, sí pasaría:** un fallo
+  pasajero de Auth la saca a `/entrar`, y como `/entrar` con sesión manda
+  siempre a `/panel` (sin mirar `desde`), acaba en la Agenda en vez de donde
+  iba. Molesto, no peligroso.
+- **No es de esta fase:** F9 no toca `proxy.ts` ni el panel. Es el mismo
+  archivo que el pendiente 4, pero otro síntoma.
+
+Arreglos posibles, **ninguno hecho** (fuera de F9; esperan tu decisión):
+`proxy.ts` escribe el error de `getUser()` en el registro y reintenta una vez
+si es pasajero; `/entrar` con sesión respeta un `desde` del panel; y la prueba
+comprueba la URL después de `goto`, para que el fallo diga «te ha echado a la
+Agenda» y no «30 s esperando un botón».
+
 ---
 
 ## 8 · Pendientes vivos
@@ -1198,3 +1257,8 @@ hasta esta publicación.
 18. ~~**🟡 `.env.local` de esta máquina: `SUPABASE_JWT_SECRET` se llama
     `SUPABASE_JWT_SECRET_DEV`**~~ ✅ Renombrada por ti el 28/09; las pruebas
     vivas vuelven a correr (§9.4).
+19. **🟡 El guardián tira el error de `getUser()`** (§11.5). Un «no» pasajero
+    de Auth con un token válido echó a una prueba a la Agenda y puso rojo el CI
+    de `main` (run 36904109929, `04-interruptor.spec.ts:87`). Falla cerrado,
+    así que no es de seguridad; en producción sacaría a recepción a la Agenda.
+    Nuevo en F9, fuera de su alcance: arreglos propuestos, sin hacer.
