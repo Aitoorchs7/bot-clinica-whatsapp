@@ -670,6 +670,12 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    ✅ **Arreglado el 01/10/2026**: variables cambiadas por una persona,
    publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`. La
    clave `anon` y el secreto se comprueban con el punto 2. `ESTADO_F9 §11.7`.
+   ✅ Comprobados el 02/10: con la clínica de prueba, `al_dia` (`ESTADO_F9 §11.9`).
+8. **🟡 La escucha en vivo de Vercel pierde líneas.** De las dos que escribe la
+   ruta de salud de seguido llega una, y su `rowId` es la marca de tiempo en
+   milisegundos. Lo más probable es que choquen. Una línea que no aparece no
+   demuestra nada. Arreglo posible, sin hacer: una sola línea por resultado.
+   `ESTADO_F9 §11.9`.
 
 ### Infraestructura
 

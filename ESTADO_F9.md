@@ -250,11 +250,11 @@ aparezca no demuestra que no pasara.
 | # | Punto | Estado |
 |---|---|---|
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
-| 2 | El secreto JWT | 🟡 **Medio.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado el 01/10, y la ruta de salud ya dice `hzanffqxlpcorrucanxd` (§11.7). Falta ver «aceptado», que comprueba a la vez la clave `anon` y el secreto: exige una clínica en el mapa (§7.5, pasos 1 y 2) |
-| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción** (§11.8). Faltan: su par en `WHATSAPP_CLINICAS`, la prueba firmada de §7.5 y **publicar la app de Meta** (§7.2) |
+| 2 | El secreto JWT | ✅ **Cerrado el 02/10.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado (§11.7). Con la clínica de prueba en la base y en el mapa, la ruta de salud dice **`al_dia`** en producción: Supabase acepta el token del bot y el bot ve su fila (§11.9) |
+| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción y en el mapa, `al_dia`** (§11.8–11.9). Faltan: la prueba firmada de §7.5 (pasos 3 y 4) y **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
 | 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
-| 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7) |
+| 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7). Con la clínica de prueba: `al_dia` (§11.9) |
 
 ---
 
@@ -1214,6 +1214,10 @@ Lo que significa:
 - **No es de esta fase:** F9 no toca `proxy.ts` ni el panel. Es el mismo
   archivo que el pendiente 4, pero otro síntoma.
 
+En el CI del PR #3 (run 36913327940, mismo código) la misma prueba salió
+**verde**: `31 passed`. Eso confirma que falla unas veces sí y otras no, y no
+lo arregla.
+
 Arreglos posibles, **ninguno hecho** (fuera de F9; quedan como pendiente 19, de acuerdo contigo el 01/10):
 `proxy.ts` escribe el error de `getUser()` en el registro y reintenta una vez
 si es pasajero; `/entrar` con sesión respeta un `desde` del panel; y la prueba
@@ -1412,6 +1416,55 @@ De paso: **`WHATSAPP_PHONE_NUMBER_ID` no lo lee nadie en `src/`.** El número
 de salida sale del mapa y de cada aviso. Es una variable de Vercel que sobra.
 No se toca.
 
+Después borraste de Windows `SUPABASE_SERVICE_ROLE_KEY_PROD` y
+`NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD`. Comprobado: «NO ESTA» las dos. El control,
+`SUPABASE_DB_URL_PROD` y `VERCEL_TOKEN`, sale «esta».
+
+### 11.9 · ✅ Punto 2 cerrado: `al_dia` en producción (02/10/2026)
+
+Paso 2 de §7.5, con tu «sí»: el par en `WHATSAPP_CLINICAS`, volver a publicar,
+y la ruta de salud.
+
+```
+-- PATCH WHATSAPP_CLINICAS · HTTP 200 · WHATSAPP_CLINICAS · sensitive · 2026-10-02 14:02:28Z
+   total 12 antes y despues · otras variables cambiadas por esto: ninguna
+-- POST /v13/deployments 14:02:41 · HTTP 200 · dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · commit aaefe04
+   14:02:47 · BUILDING · 14:03:27 · READY
+sirviendo: dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · READY · regions fra1 · crons activas en: dpl_C74em… (4)
+-- sonda previa VISTA en la escucha 14:03:57
+-- POST crons/run 14:03:58 · HTTP 200 · {"invocationAt":1790949839882}
+   14:04:01 info GET /api/cron/clinicas -1 salud de las clinicas · al_dia · supabase hzanffqxlpcorrucanxd.supabase.co · 1 clinica(s)
+-- sonda final VISTA en la escucha 14:04:49
+```
+
+**Por qué `al_dia` cierra el punto 2:** `estadoDeLaSalud()` solo devuelve
+`al_dia` si **todas** las clínicas tienen el veredicto `atiende`
+(`clinicas.ts:115`). Con una sola clínica, eso quiere decir dos cosas:
+
+1. Supabase de producción **aceptó el token del bot**, firmado con el
+   `SUPABASE_JWT_SECRET` de Vercel y mandado con su clave `anon`. Las dos son
+   las buenas.
+2. `exigirClinicaDelCanal()`, la misma función que usa el webhook, vio
+   **exactamente una** fila de `clinicas`: la suya, con
+   `wa_phone_number_id = 1143963372124362`.
+
+**Lo que no se ha visto: la línea por clínica.** La ruta escribe dos líneas
+seguidas (el resumen y `1143963372124362 -> b53d… · atiende`), y la escucha
+solo recibió la primera. Relanzada una vez más (14:05:56, solo lectura), con la
+fila en crudo:
+
+```
+CRUDO {"level":"info","message":"salud de las clinicas · al_dia · supabase hzanffqxlpcorrucanxd.supabase.co · 1 clinica(s)",
+       "messageTruncated":false,"rowId":"1790949958967","source":"function","timestampInMs":1790949958967,
+       "requestMethod":"GET","requestPath":"/api/cron/clinicas","responseStatusCode":-1}
+```
+
+`rowId` es la marca de tiempo en milisegundos. Lo más probable es que dos
+líneas escritas en el mismo milisegundo choquen y la API se quede con una. No
+está demostrado. **Consecuencia para el punto 3:** la escucha en vivo puede
+perder líneas cuando una ruta escribe varias de golpe. Que una línea no
+aparezca no quiere decir que no se escribiera (pendiente 21).
+
 ---
 
 ## 8 · Pendientes vivos
@@ -1474,4 +1527,10 @@ No se toca.
     ti, publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`.
     Nada escrito en desarrollo por producción mientras duró (mapa vacío) y
     ningún paciente afectado. La clave `anon` y el secreto se comprueban con el
-    punto 2.
+    punto 2. ✅ Comprobados el 02/10: `al_dia` (§11.9).
+21. **🟡 La escucha en vivo de Vercel pierde líneas** (§11.9). De las dos que
+    escribe la ruta de salud de seguido, llega una, y su `rowId` es la marca de
+    tiempo en milisegundos. Lo más probable es que dos líneas del mismo
+    milisegundo choquen. Para el punto 3: una línea que no aparece no demuestra
+    nada. Arreglo posible, sin hacer: que cada ruta escriba su resultado en
+    **una** sola línea. Nuevo en F9.
