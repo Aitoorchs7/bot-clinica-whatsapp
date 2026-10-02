@@ -251,7 +251,7 @@ aparezca no demuestra que no pasara.
 |---|---|---|
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
 | 2 | El secreto JWT | 🟡 **Medio.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado el 01/10, y la ruta de salud ya dice `hzanffqxlpcorrucanxd` (§11.7). Falta ver «aceptado», que comprueba a la vez la clave `anon` y el secreto: exige una clínica en el mapa (§7.5, pasos 1 y 2) |
-| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). Faltan: la clínica en el mapa y en la base (punto 6), y **publicar la app de Meta** (§7.2) |
+| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción** (§11.8). Faltan: su par en `WHATSAPP_CLINICAS`, la prueba firmada de §7.5 y **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
 | 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
 | 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7) |
@@ -1334,6 +1334,83 @@ Lo que queda demostrado y lo que no:
   punto 2, y pasa por los pasos 1 y 2 de §7.5.
 - ℹ️ El panel publicado no tiene usuarios hasta que se creen con el alta en
   producción. Esperado.
+
+### 11.8 · La clínica de prueba, dada de alta en producción (02/10/2026)
+
+Paso 1 de §7.5, con tu «sí». Tu móvil ya está en la lista «Para» del número de
+prueba (lo dijiste tú). Datos que diste: el identificador del número
+`1143963372124362`, el de la WABA `887494041017015`, un teléfono inventado y el
+correo `cobaltiautomations@gmail.com`.
+
+**Cómo:** el alta oficial (`scripts/alta-clinica.mjs`), con una ficha de datos
+inventados que vive en el scratchpad, no en el repositorio:
+
+- Teléfono de recepción `+447700900123`, del rango que Ofcom reserva para
+  ficción: no puede ser de nadie.
+- Política de privacidad en `ejemplo.test`, que no resuelve nunca.
+- Una fila de `config` y una pregunta frecuente confidenciales, con el marcador
+  `F9-CONFIDENCIAL-7Q2X`.
+
+Para dirigirla a producción, la URL y las dos claves de producción se pasan
+solo al proceso del alta, desde dos variables de usuario de Windows que pusiste
+tú (`SUPABASE_SERVICE_ROLE_KEY_PROD`, `NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD`).
+`process.loadEnvFile('.env.local')` **no pisa** lo que ya está en el entorno
+(medido con un archivo de mentira), así que `.env.local` no puede colar ninguna
+de desarrollo. El enlace para poner contraseña se tapa en la salida.
+
+**Antes, todo lectura:**
+
+```
+service_role: ref = hzanffqxlpcorrucanxd y role = service_role     si
+anon:         ref = hzanffqxlpcorrucanxd y role = anon             si
+service_role en produccion: GET clinicas -> 200 · 0 clinica(s) · slug y numero libres
+anon en clinicas:          401 · {"code":"42501","message":"permission denied for table clinicas"}
+CONTROL clave falsa:       401 · {"message":"Invalid API key"}
+anon en /auth/v1/settings: 200 · CONTROL clave falsa: 401 Invalid API key
+la ficha, con el validador del proyecto: errores 0 · avisos 0
+cerrojo del lanzador con una service_role falsa: «NO SE LANZA», codigo 1
+```
+
+El primer intento de comprobación esperaba un 200 vacío de la `anon` en
+`clinicas` y paró: estaba mal planteado. La migración de RLS quita a `anon`
+todos los permisos sobre las tablas (`20260916100400_rls.sql:846`), y el `42501`
+lo confirma **en producción**. Una clave falsa da otro error, y eso es lo que
+distingue las dos causas.
+
+**El alta (13:54 UTC):**
+
+```
+-- cerrojo: ficha si · service_role de hzanffqxlpcorrucanxd: si · anon de hzanffqxlpcorrucanxd: si
+-- alta contra https://hzanffqxlpcorrucanxd.supabase.co · 13:54:36Z
+  ok  creada · clinica_id b53d5bf6-61aa-43c0-a1c0-54b4a46d47be
+  ok  1 gabinete(s) · 5 tramo(s) de horario · 2 tratamiento(s)
+  ok  4 pregunta(s) frecuentes (3 publicas en la ficha)
+  ok  4 fila(s) de config, con las dos obligatorias
+  ok  10 bloques de prompt (9 activos)
+  ok  cobaltiautomations@gmail.com · rol propietario · creado y comprobado entrando de verdad
+  pendiente 1: WHATSAPP_CLINICAS "1143963372124362": "b53d5bf6-61aa-43c0-a1c0-54b4a46d47be" y volver a publicar
+  pendiente 2: plantillas de Meta (alta:comprobar --plantilla)
+-- el alta ha terminado con codigo 0 · 13:54:39Z
+```
+
+**Después, contado con otra credencial** (`postgres`, por
+`SUPABASE_DB_URL_PROD`, solo lectura):
+
+```
+{"slug":"prueba-f9","id":"b53d5bf6-61aa-43c0-a1c0-54b4a46d47be","wa_phone_number_id":"1143963372124362",
+ "wa_waba_id":"887494041017015","activa":true,"telefono_recepcion":"+447700900123",
+ "gabinetes":1,"horarios":5,"tratamientos":2,"faq":4,"faq_publicas":3,"config":4,"config_publicas":3,
+ "bloques":10,"bloques_activos":9}
+auth.users: cobaltiautomations@gmail.com · app_metadata rol=propietario, clinica_id=b53d5bf6-… ·
+            nada en user_metadata
+```
+
+Es la única clínica de producción. **No se ha lanzado `pnpm alta:comprobar`:**
+son pruebas contra la base, y la regla es no lanzar pruebas contra producción.
+
+De paso: **`WHATSAPP_PHONE_NUMBER_ID` no lo lee nadie en `src/`.** El número
+de salida sale del mapa y de cada aviso. Es una variable de Vercel que sobra.
+No se toca.
 
 ---
 
