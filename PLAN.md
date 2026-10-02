@@ -643,12 +643,41 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    🟡 Decidido el 29/09: Frankfurt (`"regions": ["fra1"]` en `vercel.json`,
    PR #2). Se cierra al verlo en `X-Vercel-Id` después de publicar. Y
    `SUPABASE_SERVICE_ROLE_KEY`, quitada de Vercel por una persona.
+   ✅ **Cerrado el 01/10/2026**, con la fusión del PR #2 (`aaefe04`):
+   `cdg1::fra1` en la cabecera de dos rutas de función, y el despliegue que
+   sirve es posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`. Y el
+   proyecto, también en `fra1` desde el 01/10 (antes decía `iad1`): ya no
+   depende solo de `vercel.json`. `ESTADO_F9 §11`.
 4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
-   28/09). Decisión del punto 5 de F9.
+   28/09). Decisión del punto 5 de F9. 🟡 **Decidido el 02/10: apagarlo.** Lo
+   hace una persona en el panel de Supabase. `ESTADO_F9 §12`.
 5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y
    verificado el 28/09. Pero **la app de Meta no está publicada**, y hasta que
    lo esté Meta no entrega ningún mensaje real, ni de sus administradores.
    Punto 3 de F9, `ESTADO_F9 §7.2`.
+6. **🟡 El guardián tira el error de `getUser()`.** Un «no» pasajero de Auth
+   con un token válido (la misma cookie, rechazada y aceptada 0,2 s después)
+   echó a una prueba a la Agenda y puso rojo el CI de `main` (run
+   36904109929, `04-interruptor.spec.ts:87`). Falla cerrado; en producción
+   sacaría a recepción a la Agenda. Fuera de F9, sin arreglar.
+   `ESTADO_F9 §11.5`.
+7. **🔴 El sitio publicado habla con la Supabase de desarrollo.** La ruta de
+   salud, lanzada en producción el 01/10, dice `ggalkkeobyxpodbzlwzj`
+   (desarrollo) y `ninguna_clinica`. `NEXT_PUBLIC_SUPABASE_URL` la usan el bot,
+   el panel y el guardián. Nada escrito en desarrollo por producción (mapa
+   vacío) y ningún paciente afectado. Arreglo: las cuatro variables de
+   Supabase de Vercel con los valores de producción, y volver a publicar.
+   Bloquea los puntos 2 y 3 de F9. `ESTADO_F9 §11.6`.
+   ✅ **Arreglado el 01/10/2026**: variables cambiadas por una persona,
+   publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`. La
+   clave `anon` y el secreto se comprueban con el punto 2. `ESTADO_F9 §11.7`.
+   ✅ Comprobados el 02/10: con la clínica de prueba, `al_dia` (`ESTADO_F9 §11.9`).
+8. **🟡 La escucha en vivo de Vercel pierde líneas.** De las dos que escribe la
+   ruta de salud de seguido llega una, y su `rowId` es la marca de tiempo en
+   milisegundos. Lo más probable es que choquen. Una línea que no aparece no
+   demuestra nada. Arreglo posible, sin hacer: una sola línea por resultado.
+   `ESTADO_F9 §11.9`. Y del procesamiento del bot, en `after()`, no llegó
+   ninguna con la escucha viva: para el bot manda la base. `ESTADO_F9 §11.10`.
 
 ### Infraestructura
 
@@ -683,6 +712,9 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    ⚪ **Según el traspaso de F9, la cuenta es Pro y el cron de cada hora está
    registrado.** Pendiente de comprobarlo con el token de Vercel
    (`ESTADO_F9 §0`).
+   🟡 **01/10/2026:** registrado y activo con `0 * * * *` en el despliegue que
+   sirve (`ESTADO_F9 §11.3`). Que corra cada hora lo dirá una pasada vista en
+   el registro.
 
 ### Una regla de operación que F5 amplía
 

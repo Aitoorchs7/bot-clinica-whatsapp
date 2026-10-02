@@ -6,7 +6,9 @@
 > canal— comprobada por separado y en ese orden, y con el CI midiendo lo que
 > dice medir.
 
-Fecha: 27/09/2026 · Rama `f9-publicacion`, desde `origin/main` (`79fd601`)
+Fecha: 27/09/2026 · Rama `f9-publicacion`, desde `origin/main` (`79fd601`) ·
+fusionada en `main` como `aaefe04` el 01/10 · el cierre sigue en `f9-cierre`,
+desde `aaefe04`
 
 > ⚠️ **Al abrir la fase no se ha tocado producción.** Todo lo que hay hasta §4
 > es lectura: el repositorio, el CI, la documentación y lo que el sitio
@@ -212,7 +214,8 @@ aparezca no demuestra que no pasara.
   conexión va a `aws-0-eu-central-1.pooler.supabase.com` (§6).
 - Las variables de Vercel se copiaron del proyecto de producción y no del de
   desarrollo. **Sin comprobar**: es justo lo que miden los puntos 2 y 6, y
-  desde fuera no se ve (§3.5).
+  desde fuera no se ve (§3.5). 🔴 **Refutado el 01/10** por la ruta de salud:
+  `NEXT_PUBLIC_SUPABASE_URL` es la de desarrollo (§11.6).
 - La clínica tiene su alta hecha en la base de producción. **Sin comprobar**:
   lo dirá el inventario del punto 1.
 - `SUPABASE_URL_DEV` es el proyecto `ggalkkeobyxpodbzlwzj`. **Sin comprobar**
@@ -247,11 +250,11 @@ aparezca no demuestra que no pasara.
 | # | Punto | Estado |
 |---|---|---|
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
-| 2 | El secreto JWT | 🟡 **Medio:** el proyecto sigue usando el secreto heredado (§3.4). Falta ver «aceptado» con el valor de Vercel: punto 6 |
-| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). Faltan: la clínica en el mapa y en la base (punto 6), y **publicar la app de Meta** (§7.2) |
+| 2 | El secreto JWT | ✅ **Cerrado el 02/10.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado (§11.7). Con la clínica de prueba en la base y en el mapa, la ruta de salud dice **`al_dia`** en producción: Supabase acepta el token del bot y el bot ve su fila (§11.9) |
+| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción y en el mapa, `al_dia`** (§11.8–11.9). **El bot contesta en producción** a un «Hola» firmado: se identifica como asistente virtual y Meta acepta el envío (§11.10). Falta solo que Meta entregue un mensaje real, y eso exige **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
-| 5 | Tus decisiones | ⏳ La recomendación, en §5 al llegar |
-| 6 | La ruta de salud | 🟡 **Hecha**: niveles 1 y 2 en verde (§10). Falta **publicarla, que es tocar producción**, y preguntarle al sitio |
+| 5 | Tus decisiones | ✅ **Todas contestadas.** a y d, cerradas y vistas en producción (§11). b, antes del primer paciente. e, apagar (lo haces tú, §12). c, dicha por ti y sin verificar (§12) |
+| 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7). Con la clínica de prueba: `al_dia` (§11.9) |
 
 ---
 
@@ -421,7 +424,21 @@ cada una espera tu respuesta.
 > AWS que Supabase, según la lista de regiones de Vercel del 11/08/2026;
 > ninguna ruta fija la suya con `preferredRegion`, así que manda
 > `vercel.json`). Se comprueba después de publicar con `X-Vercel-Id`.
-> b, c y e: pendientes.
+> b y e: pendientes. c · **facturación vinculada**, según tú (01/10): la clave
+> de la API en AI Studio enseña «My Billing Account». No lo he podido ver yo:
+> se dará por comprobado cuando el bot conteste más de lo que permite la cuota
+> gratuita sin un `429`.
+>
+> **Después de la fusión (01/10):** a y d, vistas en el despliegue que sirve
+> (§11): `fra1` en la cabecera de dos rutas de función, y un despliegue
+> posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`.
+>
+> **b y e, contestadas por ti el 02/10:** b · el correo de los escalados,
+> **antes del primer paciente de verdad**, no ahora: necesita un dominio propio
+> y el acuerdo de tratamiento de Resend, y eso va con tener empresa. Hasta
+> entonces, el aviso al equipo depende solo de la plantilla `aviso_escalado`.
+> e · **apagar** el registro abierto de Auth en producción. Lo haces tú en el
+> panel de Supabase (§12, paso 2).
 
 ### a · `SUPABASE_SERVICE_ROLE_KEY` en las variables de producción → **quitarla**
 
@@ -669,6 +686,30 @@ Sin el control, el cero sería el verde que no ha mirado nada.
   ningún «Hola» real llegaría al bot, ni siquiera desde tu móvil. Publicar la
   app es un paso nuevo, manual y de producción.
 - `messages`: **Suscrito** (lo miraste tú el 28/09).
+- El número del bot es **el de prueba de Meta**, `+1 (555) 185-0806` (01/10).
+  Con un número de prueba, WhatsApp solo entrega a los destinatarios de su
+  lista (WhatsApp → Configuración de la API → «Para»), así que la prueba de
+  punta a punta exige tener tu móvil en esa lista.
+- **No hay ninguna clínica todavía, ni empresa** (01/10). Para probar, una
+  clínica de prueba con datos inventados. Para publicar la app, Meta pide una
+  política de privacidad, y alguien tiene que figurar como responsable: es una
+  decisión legal, aparcada hasta que se vaya a publicar.
+
+### 7.5 · Probar el canal sin publicar la app de Meta
+
+Mientras la app no esté publicada, Meta no entrega mensajes reales, ni de los
+administradores (§7.2). Lo que sí se puede probar, de menos a más:
+
+1. ✅ La conexión con Meta: URL verificada y firma de la app (§7.3–7.4).
+2. Lo que conoce producción: la ruta de salud, en cuanto se publique.
+3. El bot de punta a punta: un aviso idéntico al de Meta, **firmado por
+   nosotros** con la clave secreta de la app, con el `phone_number_id` del
+   número de prueba y tu móvil como remitente. Recorre el bot entero (base,
+   Gemini, respuesta) y la respuesta sale por la API de WhatsApp a tu móvil.
+   Lo único que no prueba es que Meta entregue el mensaje. Exige una clínica
+   de prueba en producción y su par en `WHATSAPP_CLINICAS`, que tú escribas
+   antes al número (se abre la ventana de 24 h) y tu móvil en la lista de
+   destinatarios. Escribe en producción: paso a paso y con «sí».
 
 ### 7.3 · 🔴 El mensaje de prueba de Meta, rechazado por la firma
 
@@ -1010,11 +1051,598 @@ Es el punto 2 de F9 ensayado en desarrollo: con el secreto bueno, `atiende`;
 con otro, Supabase contesta **401 · «No suitable key or wrong key type»** y la
 ruta lo llama por su nombre.
 
+**Cómo lanzarla a mano (encontrado el 01/10):** la copia del CLI de Vercel
+que había en esta máquina (60.1.3, caché de `npx`) hace `vercel crons run`
+con un `POST /v1/projects/{id}/crons/run?teamId=…` y el cuerpo `{ path,
+schedule }`. Es una llamada normal de la API: si el token limitado al
+proyecto la acepta, se puede lanzar la comprobación sin conocer
+`CRON_SECRET`. **Sin probar**: hasta que se publique, la ruta no existe en
+producción.
+
 **Cómo se consultará en producción, y lo que no está comprobado:** es un cron,
 así que se puede lanzar a mano (`vercel crons run /api/cron/clinicas`, en la
 documentación de Vercel). Que esa llamada a mano lleve `CRON_SECRET` como la
 programada **no lo dice la documentación**: se verá la primera vez. Si no, pasa
-sola cada día a las 06:15 UTC.
+sola cada día a las 06:15 UTC. ✅ **Visto el 01/10:** la llamada por la API
+pasa el cerrojo, así que lleva `CRON_SECRET` (§11.6).
+
+---
+
+## 11 · Después de la fusión: lo que sirve producción (01/10/2026)
+
+El PR #2 lo fusionaste tú: `aaefe04`, a las 18:04:28 UTC. `git diff --stat
+131e469 aaefe04` sale vacío: lo publicado es exactamente lo que se revisó. Todo
+lo de esta sección es lectura (la API de Vercel con tu token, y tres `GET` sin
+credencial al sitio). El CI de `main` (run 36904109929) estaba lanzando
+`pruebas-vivas` contra desarrollo mientras tanto, y por eso no se lanzó nada
+vivo.
+
+### 11.1 · El despliegue (API, ~18:10 UTC)
+
+```
+sirviendo en produccion (targets.production.id): dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+  READY · aaefe04 · rama main · creado 18:04:31Z · listo 18:05:01Z · source=git
+  alias: bot-clinica-whatsapp.vercel.app, bot-clinica-whatsapp-apolo4team.vercel.app,
+         bot-clinica-whatsapp-git-main-apolo4team.vercel.app
+  regions: fra1
+el anterior: dpl_2WbGMVsy1FxtBJNkqwpSXpD4t9Fc · READY · 79fd601 · 28/09 18:11:54Z · redeploy
+```
+
+Y desde fuera, sin la API: el HTML de `/entrar` lleva
+`data-dpl-id="dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9"`. El dominio sirve ese
+despliegue.
+
+### 11.2 · Frankfurt, visto en la función y no solo en la configuración
+
+```
+18:11:21Z GET /api/cron/clinicas          401 {"estado":"no autorizado"}
+          X-Matched-Path: /api/cron/clinicas   X-Vercel-Id: cdg1::fra1::pnlwl-1790878283675-…
+18:11:22Z GET /api/whatsapp/webhook?hub.mode=subscribe&hub.verify_token=sonda-falsa&hub.challenge=123
+          403 forbidden
+          X-Matched-Path: /api/whatsapp/webhook X-Vercel-Id: cdg1::fra1::j8pqh-1790878284347-…
+18:11:23Z GET /entrar                     200   X-Panel-Guardia: proxy
+          X-Vercel-Id: cdg1::fra1::glwpz-1790878285369-…
+```
+
+El 27/09 era `cdg1::iad1` (§0.2). `proxy.ts` deja fuera `/api` entero
+(`matcher`), así que las dos primeras respuestas las da **la propia función**:
+es la región donde se ejecuta el código del bot. El 401 dice de paso que la
+ruta nueva existe en producción y que su cerrojo está puesto.
+
+⚠️ **El proyecto sigue diciendo `serverlessFunctionRegion: iad1`.** Manda
+`vercel.json`, que fija la región en cada despliegue. Consecuencia: si alguien
+quita `"regions"` de `vercel.json`, las funciones vuelven a Washington sin
+ningún aviso. Se puede cambiar también en el panel de Vercel (Settings →
+Functions → Function Region) para que las dos digan lo mismo; es un cambio de
+producción y no lo he hecho.
+
+✅ **Cambiado con tu «sí» (01/10)**, por la API:
+
+```
+ANTES   18:38:20Z · serverlessFunctionRegion: iad1 · sirviendo: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+PATCH   18:38:21Z · OK · la respuesta dice serverlessFunctionRegion: fra1
+DESPUES 18:38:21Z · serverlessFunctionRegion: fra1 · sirviendo: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+18:38:27Z GET /api/cron/clinicas · 401 · X-Vercel-Id: cdg1::fra1::hq7pp-1790879908975-…
+```
+
+Ahora el proyecto y `vercel.json` dicen lo mismo. Solo afecta a las próximas
+publicaciones (la que sirve no ha cambiado). Se deshace con el mismo `PATCH`
+y `iad1`.
+
+### 11.3 · Las cuatro crons
+
+```
+crons del despliegue dpl_GeVZ…:          crons activas del proyecto:
+  0 * * * *   /api/cron/recordatorios      deploymentId: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9
+  30 4 * * *  /api/cron/retencion          enabledAt 27/09 15:47:45Z · disabledAt - ·
+  0 6 * * *   /api/cron/salud              updatedAt 01/10 18:05:01Z
+  15 6 * * *  /api/cron/clinicas           (las mismas cuatro, mismos horarios)
+```
+
+Registradas y activas, y movidas al despliegue nuevo en el mismo segundo en
+que quedó listo. Que estén registradas no dice que corran: eso lo dice cada
+pasada.
+
+### 11.4 · `SUPABASE_SERVICE_ROLE_KEY`, fuera del despliegue que sirve
+
+```
+variables: 12, todas production · sensitive (nombre, entorno, tipo; sin valores)
+  27/09 15:47:20Z  WHATSAPP_PHONE_NUMBER_ID · WHATSAPP_TOKEN · WHATSAPP_VERIFY_TOKEN ·
+                   CRON_SECRET · WHATSAPP_CLINICAS · DEEPGRAM_API_KEY ·
+                   NEXT_PUBLIC_SUPABASE_URL · NEXT_PUBLIC_SUPABASE_ANON_KEY ·
+                   GOOGLE_AI_API_KEY · SUPABASE_PROJECT_REF
+  27/09 16:49:31Z  SUPABASE_JWT_SECRET
+  28/09 18:11:34Z  META_APP_SECRET
+¿SUPABASE_SERVICE_ROLE_KEY en la lista? no
+variable modificada mas tarde: 28/09 18:11:34Z · despliegue creado: 01/10 18:04:31Z · ¿posterior? si
+```
+
+**La hora exacta del borrado no se puede leer**: la lista de variables no
+guarda las borradas, y el registro de actividad da 403 con tu token, que está
+limitado al proyecto (`"You don't have permission to list the event"`, en
+`/v3/events` y en `/v1/events`). Queda acotada entre fechas: el 28/09 a las
+18:11:34 había 13 variables (§7.3), el 29/09 había 12 y ninguna era esta (§5),
+y el despliegue que sirve es del 01/10. El que servía hasta hoy, `dpl_2WbG…`
+(28/09 18:11:54Z), **es anterior al borrado**: por eso llevaba la clave dentro
+hasta esta publicación.
+
+**Decisiones a y d: cerradas.** Pendiente 14: cerrado.
+
+### 11.5 · 🔴 El CI de `main` salió rojo: un clic de navegador, y no es de F9
+
+Run 36904109929 (push de `aaefe04`):
+
+```
+comprobaciones-estaticas  success   18:04:35 → 18:06:40 UTC
+auditoria-de-fuga         success   18:04:36 → 18:06:22 UTC
+pruebas-vivas             failure   18:06:27 → 18:17:27 UTC
+   Test Files  48 passed | 3 skipped (51)
+        Tests  1074 passed | 36 skipped (1110)      <- Vitest, el mismo número que en el PR
+   ✘ 25 tests/e2e/04-interruptor.spec.ts:87:7 › apagar el interruptor ›
+        y el asistente vuelve a decirlo en cuanto se enciende (30.1s)
+        Test timeout of 30000ms exceeded.
+   1 failed · 30 passed (2.5m)                      <- Playwright
+```
+
+El árbol de `aaefe04` es idéntico al de `131e469`, que pasó entero en el PR
+(run 36600187683). La misma prueba, con el mismo código, verde allí y roja
+aquí. Antes de llamarlo «inestable», la traza que sube el CI
+(`playwright-trazas`):
+
+```
+pasos de la prueba (segundos desde el inicio)
+  2.48  entrarComo() termina: la URL ya es /panel
+  2.48  Navigate /panel/conocimiento  ->  termina bien a los 3.84
+  3.84  Click «encender-publico»      ->  espera 26 s a un boton que no aparece
+  foto del fallo: la AGENDA (/panel), no /panel/conocimiento
+
+peticiones de documento, con la cookie de sesion comparada por su huella SHA-256
+  18:16:20.906 POST /entrar                  200  set-cookie sb-…-auth-token  huella 56a6c088d76c
+  18:16:21.992 GET  /panel/conocimiento      307 -> /entrar?desde=…          huella 56a6c088d76c
+  18:16:22.216 GET  /entrar?desde=…          307 -> /panel                   huella 56a6c088d76c
+  18:16:22.449 GET  /panel                   200                             huella 56a6c088d76c
+```
+
+**El mismo token, rechazado por el guardián y aceptado 0,2 s después.** No es
+una carrera de la prueba con la cookie (el navegador ya la mandaba): es
+`supabase.auth.getUser()` diciendo «no» una vez, un segundo después de entrar,
+contra el Auth de desarrollo. Y `proxy.ts` no mira el `error` de `getUser()`:
+cualquier fallo de Auth se trata como «no hay sesión». Por eso no se puede
+saber qué contestó Auth exactamente; el servidor de la prueba no escribió nada.
+
+Lo que significa:
+
+- **Para la seguridad, nada malo.** El guardián falla cerrado, que es lo que
+  tiene que hacer.
+- **Para una persona de recepción, en producción, sí pasaría:** un fallo
+  pasajero de Auth la saca a `/entrar`, y como `/entrar` con sesión manda
+  siempre a `/panel` (sin mirar `desde`), acaba en la Agenda en vez de donde
+  iba. Molesto, no peligroso.
+- **No es de esta fase:** F9 no toca `proxy.ts` ni el panel. Es el mismo
+  archivo que el pendiente 4, pero otro síntoma.
+
+En el CI del PR #3 (run 36913327940, mismo código) la misma prueba salió
+**verde**: `31 passed`. Eso confirma que falla unas veces sí y otras no, y no
+lo arregla.
+
+Arreglos posibles, **ninguno hecho** (fuera de F9; quedan como pendiente 19, de acuerdo contigo el 01/10):
+`proxy.ts` escribe el error de `getUser()` en el registro y reintenta una vez
+si es pasajero; `/entrar` con sesión respeta un `desde` del panel; y la prueba
+comprueba la URL después de `goto`, para que el fallo diga «te ha echado a la
+Agenda» y no «30 s esperando un botón».
+
+### 11.6 · 🔴 La ruta de salud, en producción: `ninguna_clinica`, y **el sitio apunta a la Supabase de desarrollo**
+
+Con tu «sí» (01/10). Escucha del registro abierta antes, sonda propia vista
+antes de lanzar y otra vista después, y el `POST /v1/projects/{id}/crons/run`
+que salió de la caché del CLI:
+
+```
+despliegue que sirve: dpl_GeVZ3CjbXZAn6JUiN4ntqjskPbL9 · ahora 18:31:25Z
+-- sonda previa 1 enviada 18:31:36 · HTTP 403
+-- escucha abierta 18:31:41 · HTTP 200
+   18:31:37 error GET /api/whatsapp/webhook -1 ⚠ Verificacion del webhook con un verify_token que no cuadra.
+-- sonda previa VISTA en la escucha 18:31:42
+-- POST crons/run 18:31:43 · HTTP 200 · {"invocationAt":1790879504350}
+   18:31:44 error GET /api/cron/clinicas -1 salud de las clinicas · ninguna_clinica · supabase ggalkkeobyxpodbzlwzj.supabase.co · 0 clinica(s) · WHATSAPP_CLINICAS esta vacio: este despliegue no atiende a ninguna clinica.
+-- sonda final 1 enviada 18:32:28 · HTTP 403
+   18:32:29 error GET /api/whatsapp/webhook -1 ⚠ Verificacion del webhook con un verify_token que no cuadra.
+-- sonda final VISTA en la escucha 18:32:34
+== resumen
+   escucha viva antes: si · despues: si
+   cron lanzada: si (HTTP 200)
+   lineas de /api/cron/clinicas: 1
+```
+
+Tres cosas, por orden de gravedad:
+
+1. **🔴 `ggalkkeobyxpodbzlwzj` es desarrollo. Producción es `hzanffqxlpcorrucanxd`.**
+   El host sale de `NEXT_PUBLIC_SUPABASE_URL` (`clinicas.ts:135`), y esa misma
+   variable es la que usan los tres caminos a Supabase: el bot (`bot.ts:72`),
+   el panel (`servidor.ts:24`) y el guardián (`proxy.ts:80`). O sea, **el sitio
+   publicado entero, panel y bot, habla con la base de desarrollo**. La base de
+   producción, con sus diez migraciones (§6), no la usa nadie. Queda
+   **refutado** el supuesto de §1 («las variables de Vercel se copiaron del
+   proyecto de producción»), y contestada la pregunta de §3.5.
+   - **Lo que no ha pasado, comprobado en el código:** ninguna cron de
+     producción ha escrito en desarrollo. `recordatorios` y `retencion` recorren
+     `WHATSAPP_CLINICAS` (`recordatorios.ts:146`, `retencion.ts:129`), que está
+     vacío, y `salud` solo llama a Gemini. Ningún paciente ha escrito: la app de
+     Meta no está publicada y no hay clínica.
+   - **Lo que sí implica hoy:** el panel publicado autentica contra el Auth de
+     desarrollo, donde están los usuarios de prueba, cuya contraseña está escrita
+     en el repositorio (`tests/e2e/ayuda.ts`). Con el repositorio en la mano se
+     entra al panel publicado y se ven los datos sembrados, que son inventados.
+     El repositorio es privado.
+   - **Y si se hubiera llegado a publicar así:** los mensajes de pacientes de
+     verdad acabarían en la base que la suite siembra, purga y limpia en cada PR.
+2. **`ninguna_clinica`: `WHATSAPP_CLINICAS` está vacío.** Esperado, porque no
+   hay clínica (§7.2). Con el mapa vacío la ruta **no llega a probar el token**:
+   esa prueba va por clínica. **El punto 2 sigue abierto**, y ahora depende de
+   arreglar antes lo del punto 1 de esta lista.
+3. **✅ La llamada a mano por la API lleva `CRON_SECRET`.** La línea solo puede
+   salir después de pasar el cerrojo, que sin el secreto contesta 401 sin
+   escribir nada. Lo que §10 daba por no comprobado («que esa llamada a mano
+   lleve `CRON_SECRET` como la programada»), comprobado. Y el endpoint
+   `crons/run`, que nunca se había probado, funciona con el token limitado al
+   proyecto.
+
+**El arreglo** (toca producción: lo hace una persona, para que las claves no
+pasen por el chat): en Vercel, las cuatro variables de Supabase con los valores
+**del proyecto de producción** (`NEXT_PUBLIC_SUPABASE_URL`,
+`NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` y
+`SUPABASE_PROJECT_REF`), y volver a publicar. Después, otra vez esta ruta:
+tiene que decir `supabase hzanffqxlpcorrucanxd.supabase.co`.
+
+### 11.7 · ✅ Arreglado: el sitio ya habla con la base de producción
+
+**Las variables, cambiadas por ti** (01/10, leídas por la API sin valores):
+
+```
+ahora 19:13:49Z · total: 12
+  2026-10-01 19:11:01Z · NEXT_PUBLIC_SUPABASE_URL · production · encrypted  <- cambiada hoy
+  2026-10-01 19:11:51Z · NEXT_PUBLIC_SUPABASE_ANON_KEY · production · encrypted  <- cambiada hoy
+  2026-10-01 19:12:17Z · SUPABASE_JWT_SECRET · production · sensitive  <- cambiada hoy
+  2026-10-01 19:12:48Z · SUPABASE_PROJECT_REF · production · sensitive  <- cambiada hoy
+  (las otras ocho, sin tocar desde el 27/09 y el 28/09)
+¿estan las cuatro? 4 de 4 · ¿SUPABASE_SERVICE_ROLE_KEY? no
+```
+
+Las dos `NEXT_PUBLIC_*` han pasado de «sensitive» a «encrypted». No es un
+problema: la URL y la clave `anon` son públicas por diseño. Las dos secretas
+siguen «sensitive».
+
+**Publicado con tu «sí»**, volviendo a publicar `dpl_GeVZ…` (mismo commit),
+para que la compilación recoja las variables:
+
+```
+-- POST /v13/deployments 19:14:29 · HTTP 200 · dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw · INITIALIZING · commit aaefe04
+   19:14:35 · BUILDING
+   19:15:15 · READY
+sirviendo en produccion: dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw · creado 19:14:30Z · regions: fra1
+crons activas del proyecto -> deploymentId: dpl_H1oZcgtDqCkmnyC9A5eax98V8Evw (las cuatro, mismos horarios)
+```
+
+**La ruta de salud, otra vez** (escucha viva antes y después):
+
+```
+-- POST crons/run 19:15:59 · HTTP 200 · {"invocationAt":1790882161026}
+   19:16:01 error GET /api/cron/clinicas -1 salud de las clinicas · ninguna_clinica · supabase hzanffqxlpcorrucanxd.supabase.co · 0 clinica(s) · WHATSAPP_CLINICAS esta vacio: este despliegue no atiende a ninguna clinica.
+   escucha viva antes: si · despues: si
+```
+
+Y desde fuera: `/` y `/panel` redirigen con la marca del guardián, y `/entrar`
+da 200 desde `cdg1::fra1` con `data-dpl-id="dpl_H1oZ…"`.
+
+Lo que queda demostrado y lo que no:
+
+- ✅ **La URL es la de producción.** Lo dice el propio despliegue.
+- ✅ Los usuarios de prueba de desarrollo ya no entran en el panel publicado:
+  el panel autentica contra el Auth de producción, que no los tiene.
+- ⚪ **La clave `anon` y el secreto JWT, sin comprobar.** Con el mapa vacío la
+  ruta no prueba el token, y una petición sin sesión no llega a usar la clave.
+  Se comprueban las dos a la vez cuando haya una clínica en el mapa: es el
+  punto 2, y pasa por los pasos 1 y 2 de §7.5.
+- ℹ️ El panel publicado no tiene usuarios hasta que se creen con el alta en
+  producción. Esperado.
+
+### 11.8 · La clínica de prueba, dada de alta en producción (02/10/2026)
+
+Paso 1 de §7.5, con tu «sí». Tu móvil ya está en la lista «Para» del número de
+prueba (lo dijiste tú). Datos que diste: el identificador del número
+`1143963372124362`, el de la WABA `887494041017015`, un teléfono inventado y el
+correo `cobaltiautomations@gmail.com`.
+
+**Cómo:** el alta oficial (`scripts/alta-clinica.mjs`), con una ficha de datos
+inventados que vive en el scratchpad, no en el repositorio:
+
+- Teléfono de recepción `+447700900123`, del rango que Ofcom reserva para
+  ficción: no puede ser de nadie.
+- Política de privacidad en `ejemplo.test`, que no resuelve nunca.
+- Una fila de `config` y una pregunta frecuente confidenciales, con el marcador
+  `F9-CONFIDENCIAL-7Q2X`.
+
+Para dirigirla a producción, la URL y las dos claves de producción se pasan
+solo al proceso del alta, desde dos variables de usuario de Windows que pusiste
+tú (`SUPABASE_SERVICE_ROLE_KEY_PROD`, `NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD`).
+`process.loadEnvFile('.env.local')` **no pisa** lo que ya está en el entorno
+(medido con un archivo de mentira), así que `.env.local` no puede colar ninguna
+de desarrollo. El enlace para poner contraseña se tapa en la salida.
+
+**Antes, todo lectura:**
+
+```
+service_role: ref = hzanffqxlpcorrucanxd y role = service_role     si
+anon:         ref = hzanffqxlpcorrucanxd y role = anon             si
+service_role en produccion: GET clinicas -> 200 · 0 clinica(s) · slug y numero libres
+anon en clinicas:          401 · {"code":"42501","message":"permission denied for table clinicas"}
+CONTROL clave falsa:       401 · {"message":"Invalid API key"}
+anon en /auth/v1/settings: 200 · CONTROL clave falsa: 401 Invalid API key
+la ficha, con el validador del proyecto: errores 0 · avisos 0
+cerrojo del lanzador con una service_role falsa: «NO SE LANZA», codigo 1
+```
+
+El primer intento de comprobación esperaba un 200 vacío de la `anon` en
+`clinicas` y paró: estaba mal planteado. La migración de RLS quita a `anon`
+todos los permisos sobre las tablas (`20260916100400_rls.sql:846`), y el `42501`
+lo confirma **en producción**. Una clave falsa da otro error, y eso es lo que
+distingue las dos causas.
+
+**El alta (13:54 UTC):**
+
+```
+-- cerrojo: ficha si · service_role de hzanffqxlpcorrucanxd: si · anon de hzanffqxlpcorrucanxd: si
+-- alta contra https://hzanffqxlpcorrucanxd.supabase.co · 13:54:36Z
+  ok  creada · clinica_id b53d5bf6-61aa-43c0-a1c0-54b4a46d47be
+  ok  1 gabinete(s) · 5 tramo(s) de horario · 2 tratamiento(s)
+  ok  4 pregunta(s) frecuentes (3 publicas en la ficha)
+  ok  4 fila(s) de config, con las dos obligatorias
+  ok  10 bloques de prompt (9 activos)
+  ok  cobaltiautomations@gmail.com · rol propietario · creado y comprobado entrando de verdad
+  pendiente 1: WHATSAPP_CLINICAS "1143963372124362": "b53d5bf6-61aa-43c0-a1c0-54b4a46d47be" y volver a publicar
+  pendiente 2: plantillas de Meta (alta:comprobar --plantilla)
+-- el alta ha terminado con codigo 0 · 13:54:39Z
+```
+
+**Después, contado con otra credencial** (`postgres`, por
+`SUPABASE_DB_URL_PROD`, solo lectura):
+
+```
+{"slug":"prueba-f9","id":"b53d5bf6-61aa-43c0-a1c0-54b4a46d47be","wa_phone_number_id":"1143963372124362",
+ "wa_waba_id":"887494041017015","activa":true,"telefono_recepcion":"+447700900123",
+ "gabinetes":1,"horarios":5,"tratamientos":2,"faq":4,"faq_publicas":3,"config":4,"config_publicas":3,
+ "bloques":10,"bloques_activos":9}
+auth.users: cobaltiautomations@gmail.com · app_metadata rol=propietario, clinica_id=b53d5bf6-… ·
+            nada en user_metadata
+```
+
+Es la única clínica de producción. **No se ha lanzado `pnpm alta:comprobar`:**
+son pruebas contra la base, y la regla es no lanzar pruebas contra producción.
+
+De paso: **`WHATSAPP_PHONE_NUMBER_ID` no lo lee nadie en `src/`.** El número
+de salida sale del mapa y de cada aviso. Es una variable de Vercel que sobra.
+No se toca.
+
+Después borraste de Windows `SUPABASE_SERVICE_ROLE_KEY_PROD` y
+`NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD`. Comprobado: «NO ESTA» las dos. El control,
+`SUPABASE_DB_URL_PROD` y `VERCEL_TOKEN`, sale «esta».
+
+### 11.9 · ✅ Punto 2 cerrado: `al_dia` en producción (02/10/2026)
+
+Paso 2 de §7.5, con tu «sí»: el par en `WHATSAPP_CLINICAS`, volver a publicar,
+y la ruta de salud.
+
+```
+-- PATCH WHATSAPP_CLINICAS · HTTP 200 · WHATSAPP_CLINICAS · sensitive · 2026-10-02 14:02:28Z
+   total 12 antes y despues · otras variables cambiadas por esto: ninguna
+-- POST /v13/deployments 14:02:41 · HTTP 200 · dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · commit aaefe04
+   14:02:47 · BUILDING · 14:03:27 · READY
+sirviendo: dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · READY · regions fra1 · crons activas en: dpl_C74em… (4)
+-- sonda previa VISTA en la escucha 14:03:57
+-- POST crons/run 14:03:58 · HTTP 200 · {"invocationAt":1790949839882}
+   14:04:01 info GET /api/cron/clinicas -1 salud de las clinicas · al_dia · supabase hzanffqxlpcorrucanxd.supabase.co · 1 clinica(s)
+-- sonda final VISTA en la escucha 14:04:49
+```
+
+**Por qué `al_dia` cierra el punto 2:** `estadoDeLaSalud()` solo devuelve
+`al_dia` si **todas** las clínicas tienen el veredicto `atiende`
+(`clinicas.ts:115`). Con una sola clínica, eso quiere decir dos cosas:
+
+1. Supabase de producción **aceptó el token del bot**, firmado con el
+   `SUPABASE_JWT_SECRET` de Vercel y mandado con su clave `anon`. Las dos son
+   las buenas.
+2. `exigirClinicaDelCanal()`, la misma función que usa el webhook, vio
+   **exactamente una** fila de `clinicas`: la suya, con
+   `wa_phone_number_id = 1143963372124362`.
+
+**Lo que no se ha visto: la línea por clínica.** La ruta escribe dos líneas
+seguidas (el resumen y `1143963372124362 -> b53d… · atiende`), y la escucha
+solo recibió la primera. Relanzada una vez más (14:05:56, solo lectura), con la
+fila en crudo:
+
+```
+CRUDO {"level":"info","message":"salud de las clinicas · al_dia · supabase hzanffqxlpcorrucanxd.supabase.co · 1 clinica(s)",
+       "messageTruncated":false,"rowId":"1790949958967","source":"function","timestampInMs":1790949958967,
+       "requestMethod":"GET","requestPath":"/api/cron/clinicas","responseStatusCode":-1}
+```
+
+`rowId` es la marca de tiempo en milisegundos. Lo más probable es que dos
+líneas escritas en el mismo milisegundo choquen y la API se quede con una. No
+está demostrado. **Consecuencia para el punto 3:** la escucha en vivo puede
+perder líneas cuando una ruta escribe varias de golpe. Que una línea no
+aparezca no quiere decir que no se escribiera (pendiente 21).
+
+### 11.10 · 🟡 El bot contesta en producción: todo menos la entrega de Meta (02/10/2026)
+
+Pasos 3 y 4 de §7.5. Tú escribiste «Hola» desde tu móvil (+34 685 22 74 13)
+al número de prueba, lo que abre la ventana de 24 h; ese mensaje no llega al
+bot porque la app no está publicada. Pusiste la clave secreta de la app como
+variable de usuario (`META_APP_SECRET_PROD`), y con eso firmé un aviso
+idéntico al de Meta.
+
+```
+despliegue que sirve: dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · ahora 14:13:40Z
+-- sonda previa VISTA en la escucha 14:13:57
+-- aviso VACIO con la firma buena 14:13:57 · HTTP 200 · EVENT_RECEIVED
+-- CONTROL aviso VACIO con firma falsa 14:13:58 · HTTP 401 · unauthorized
+-- el «Hola» simulado: de +34685227413 a 1143963372124362 · id wamid.PRUEBAF9.1790950438.9cdf6fb4
+-- POST del «Hola» firmado 14:13:58 · HTTP 200 · EVENT_RECEIVED
+   14:13:59 error POST /api/whatsapp/webhook -1 ⚠ Webhook con firma que no cuadra: 401.   <- el CONTROL
+-- sonda final VISTA en la escucha 14:15:20
+   escucha viva antes: si · despues: si · lineas recibidas: 3
+```
+
+**La escucha no recogió ni una línea del procesamiento.** El bot sí escribió
+(el contador escribe en el registro en cada prompt montado), y la escucha
+estaba viva antes y después. Todo lo que pasa dentro de `after()`, es decir
+después de contestar el 200, no ha llegado a la API de registros en vivo.
+Amplía el pendiente 21: **para el bot, lo que manda es la base, no la
+escucha.**
+
+**La base de producción** (solo lectura, por `SUPABASE_DB_URL_PROD`, 14:15:52):
+
+```
+eventos_webhook  msg:wamid.PRUEBAF9.1790950438.9cdf6fb4 · recibido 14:14:00.17 · procesado 14:14:12.23
+conversaciones   +34685227413 · abierta · requiere_humano false · iniciada 14:14:00.42
+mensajes  1 · paciente · entregado · «Hola»                                       · 14:14:00.73
+          2 · bot      · enviado   · tokens 4698 / 86 · wamid.HBgLMzQ2ODUyMjc0MTMVAgARGBJENTFCRTc3NEFENzQ1RDgzOEIA · 14:14:10.90
+              «Hola, soy Asistente, el asistente virtual de Clínica de prueba F9. Quien contesta es un
+               sistema automático, no una persona del equipo. Aquí está cómo tratamos los datos:
+               https://ejemplo.test/privacidad. ¿En qué puedo ayudar?»
+eventos   contador_prompt · 14:14:09.13 · alarma false
+          faq 3 de 3 (0 retenidas) · config 3 de 3 · bloques 9 de 9 · horarios 5 de 5 · tratamientos 2 de 2
+```
+
+Lo que demuestra:
+
+- ✅ **El camino entero del bot, en producción:** firma, anotación única del
+  evento, conversación, los 8 s que agrupan mensajes, clasificador y cerebro
+  en Gemini, respuesta guardada y enviada. Unos 12 s de punta a punta.
+- ✅ **Se identifica como asistente virtual en el primer mensaje** (art. 50 del
+  Reglamento de IA) y enlaza la política de privacidad de la clínica.
+- ✅ **Meta aceptó el envío:** el `wa_message_id` de la respuesta es uno de
+  verdad (`wamid.HBgL…`), devuelto por la API de WhatsApp. Se queda en
+  «enviado» porque los avisos de estado (entregado, leído) son webhooks, y con
+  la app sin publicar no llegan.
+- ✅ **Barandilla 2, en producción:** el bot vio 3 de las 4 preguntas
+  frecuentes y 3 de las 4 filas de `config` (el total real se contó con
+  `postgres` en §11.8). En las dos tablas, la que falta es la confidencial. El
+  contador dice «3 de 3» porque su segundo número es lo que le devolvió la
+  consulta al bot, no el total de la tabla (`contador.ts:13-28`). La respuesta
+  no lleva el marcador `F9-CONFIDENCIAL-7Q2X`.
+- ✅ **La respuesta llegó a tu móvil** (lo confirmaste tú el 02/10). Es la
+  única prueba de entrega que hay mientras la app no esté publicada.
+- ⚪ **Que Meta entregue un mensaje real al webhook:** no se puede probar hasta
+  publicar la app (§7.2). Es lo único del punto 3 que falta.
+
+Después borraste `META_APP_SECRET_PROD` de Windows. Comprobado: «NO ESTA»; el
+control (`SUPABASE_DB_URL_PROD`, `VERCEL_TOKEN`) sale «esta». Tu número y los
+dos mensajes siguen en producción; los borra la purga a los 90 días, o antes si
+se pide.
+
+---
+
+## 12 · Lo que tienes que hacer tú, sí o sí (02/10/2026)
+
+Solo lo que no puede hacer un agente: decisiones, cuentas, pagos, identidad y
+claves que no deben pasar por el chat. Donde hay una parte técnica que puedo
+hacer yo después, va marcado **→ luego, conmigo**. Por orden de urgencia.
+
+### A · Ya (unos minutos cada uno)
+
+1. **GitHub · fusionar el PR #3** cuando su CI salga verde.
+   https://github.com/Aitoorchs7/bot-clinica-whatsapp/pull/3 → «Merge pull
+   request» → «Confirm merge». Solo lleva documentación; publica lo mismo que
+   ya sirve.
+2. **Supabase · apagar el registro abierto** (decisión e). Proyecto de
+   **producción** (`hzanffqxlpcorrucanxd`) → Authentication → Sign In /
+   Providers → desactivar «Allow new users to sign up» → Save. No afecta a
+   entrar con contraseña ni al alta. **→ luego, conmigo:** compruebo que un
+   registro con la clave anon da error.
+3. **Google · confirmar la facturación de Gemini** (decisión c, hoy solo dicha
+   por ti). En AI Studio, la clave del bot tiene que estar en un proyecto con
+   facturación (nivel de pago). En la consola de Google Cloud → Facturación →
+   **Presupuestos y alertas**, pon un presupuesto mensual con aviso por correo.
+   El precio de `gemini-3.6-flash` **se duplica el 1/1/2027** (§5c).
+4. **Meta · comprobar que el `WHATSAPP_TOKEN` no caduca.** Ha durado más de
+   cinco días, así que no es el temporal de 24 h, pero puede ser uno de 60
+   días. Lo que tiene que ser: un token de un **usuario del sistema**
+   (Configuración del negocio → Usuarios del sistema) con caducidad «Nunca» y
+   los permisos `whatsapp_business_messaging` y
+   `whatsapp_business_management`. Si no lo es, generas uno así y lo pegas tú
+   en Vercel. **→ luego, conmigo:** vuelvo a publicar.
+
+### B · Antes del primer paciente de verdad
+
+5. **Lo legal: quién es el responsable.** Empresa o autónomo, y con eso:
+   - la política de privacidad;
+   - el contrato de encargado del tratamiento con cada clínica (la clínica es
+     la responsable y tú, su encargado);
+   - los acuerdos de tratamiento de datos (DPA) con los proveedores: Supabase,
+     Vercel, Google (Gemini), Meta, Deepgram y Resend;
+   - el registro de actividades de tratamiento.
+
+   Esto conviene revisarlo con un asesor de protección de datos: no es algo que
+   deba decidir un agente. **→ luego, conmigo:** la página `/privacidad` con tu
+   texto.
+6. **Meta · publicar la app.**
+   - La URL de la política de privacidad (paso 5).
+   - El caso de uso «Conecta con los clientes a través de WhatsApp».
+   - La **verificación del negocio** en el administrador comercial.
+   - Hasta que esté publicada, Meta no entrega ningún mensaje real. Es lo único
+     que falta del punto 3 (§11.10).
+7. **Meta · el número de verdad de la clínica.**
+   - Darlo de alta en la WABA, con su nombre visible aprobado y su PIN de
+     verificación en dos pasos.
+   - Un **método de pago** en la cuenta de WhatsApp Business.
+   - **→ luego, conmigo:** su `phone_number_id` en la ficha y en
+     `WHATSAPP_CLINICAS`.
+8. **Meta · crear y aprobar las tres plantillas**, con el cuerpo exacto de
+   `entregas/plantillas-meta.md`: `recordatorio_cita`, `confirmacion_cita` y
+   `aviso_escalado`. Sin la última, hoy el equipo no se entera de un escalado.
+   **→ luego, conmigo, si tú lo decides:** `pnpm alta:comprobar <slug>
+   --plantilla <movil>`, que manda un centinela de verdad. Son pruebas contra
+   producción, así que va con tu «sí» expreso.
+9. **Resend · el correo de los escalados** (decisión b).
+   - Una cuenta y un dominio tuyo verificado con sus registros DNS.
+   - Su DPA.
+   - Pegar tú `RESEND_API_KEY` y `EMAIL_REMITENTE` en Vercel.
+   - **→ luego, conmigo:** volver a publicar y probarlo.
+10. **Supabase · el plan de producción.** Comprobar que el proyecto no está en
+    un plan que se pause por inactividad y que tiene copias de seguridad. Es
+    una base con datos de pacientes.
+11. **La clínica de verdad: la entrevista y sus datos.** Lo que contesta la
+    clínica, y qué es público y qué confidencial. **→ luego, conmigo:** la
+    ficha (`/alta-clinica`) y `pnpm alta` contra producción. Exige volver a
+    poner la `service_role` como variable de Windows un rato, como el 02/10.
+12. **Decidir qué se hace con la clínica de prueba** (`prueba-f9`, el usuario
+    `cobaltiautomations@gmail.com` y tus dos mensajes). Se puede quedar como
+    canario con el número de prueba, o borrarla antes de la primera clínica
+    real. **→ luego, conmigo:** el borrado, que es un solo `DELETE` en cascada,
+    con tu «sí».
+
+### C · Antes de que acabe 2026
+
+13. **Supabase retira las claves heredadas** (`anon`, `service_role`; fecha
+    anunciada «finales de 2026», sin confirmar; pendiente 13). Tú generas las
+    claves nuevas en el panel y las pegas en Vercel. **→ luego, conmigo:** el
+    cambio de `bot.ts`, que no se toca sin tu confirmación, y las pruebas. La
+    ruta de salud lo cantaría el día que pase, pero mejor no esperar a eso.
+
+### D · Higiene de cuentas y del equipo, al cerrar F9
+
+14. **Vercel · el `VERCEL_TOKEN` de esta máquina.** Cuando acabe la fase,
+    revócalo o ponle caducidad (Vercel → Account Settings → Tokens), y bórralo
+    de las variables de Windows.
+15. **`SUPABASE_DB_URL_PROD` en Windows.** Decide si se queda (sirve para
+    inventarios de solo lectura y para un `db push` con tu «sí») o se va. Si se
+    va, cambia también la contraseña de la base en Supabase.
+16. **GitHub · el merge no está bloqueado** (pendiente 2). Con un repositorio
+    privado en el plan gratuito no se pueden exigir los checks antes de
+    fusionar. O se pasa a un plan que lo permita, o se acepta y se fusiona solo
+    con el CI en verde, como hasta ahora.
+17. **Vercel · opcionales.** Borrar `WHATSAPP_PHONE_NUMBER_ID`, que no lee
+    nadie (§11.8), y poner un límite de gasto en el plan Pro.
 
 ---
 
@@ -1039,7 +1667,9 @@ sola cada día a las 06:15 UTC.
 7. **La cuota de Gemini son 20 peticiones al día por modelo.** Punto 5.
 8. **El horario del cron depende del plan de Vercel.** Según el traspaso, la
    cuenta es Pro y el cron de cada hora está registrado. Lo compruebo yo cuando
-   tenga el token.
+   tenga el token. 🟡 **01/10:** registrado y activo con `0 * * * *` en el
+   despliegue que sirve (§11.3); que corra cada hora lo dirá una pasada vista
+   en el registro.
 9. **F3b**, aparcada, sin cambios.
 10. **El `README.md` sigue siendo el de `create-next-app`.** Fuera de esta fase
     salvo que se pida.
@@ -1050,11 +1680,13 @@ sola cada día a las 06:15 UTC.
 13. **⚠️ El bot depende del secreto JWT heredado y de la clave `anon`**, y
     Supabase retira las claves heredadas a finales de 2026 (§3.4). Nuevo en F9.
     Fuera de esta fase: toca `bot.ts`.
-14. **⚠️ Las funciones corren en `iad1`** (§3.3). Nuevo en F9. Punto 5.
-    🟡 Decidido el 29/09: `fra1`, en el PR #2. Se cierra al ver `fra1` en
-    `X-Vercel-Id` después de publicar.
+14. ~~**⚠️ Las funciones corren en `iad1`** (§3.3).~~ ✅ **Cerrado el
+    01/10/2026**: `cdg1::fra1` en la cabecera de dos rutas de función del
+    despliegue `aaefe04` (§11.2). Y el proyecto, también en `fra1` desde el
+    01/10 a las 18:38 UTC: ya no depende solo de `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
-    28/09). Nuevo en F9. Punto 5.
+    28/09). Nuevo en F9. Punto 5. 🟡 **Decidido el 02/10: apagarlo.** Lo hace
+    una persona en el panel (§12, paso 2). Se cierra cuando lo hagas.
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
     el 28/09 (§7.2).
 17. **🔴 La app de Meta no está publicada**: hasta que lo esté, Meta no entrega
@@ -1065,3 +1697,22 @@ sola cada día a las 06:15 UTC.
 18. ~~**🟡 `.env.local` de esta máquina: `SUPABASE_JWT_SECRET` se llama
     `SUPABASE_JWT_SECRET_DEV`**~~ ✅ Renombrada por ti el 28/09; las pruebas
     vivas vuelven a correr (§9.4).
+19. **🟡 El guardián tira el error de `getUser()`** (§11.5). Un «no» pasajero
+    de Auth con un token válido echó a una prueba a la Agenda y puso rojo el CI
+    de `main` (run 36904109929, `04-interruptor.spec.ts:87`). Falla cerrado,
+    así que no es de seguridad; en producción sacaría a recepción a la Agenda.
+    Nuevo en F9, fuera de su alcance: arreglos propuestos, sin hacer.
+20. ~~**🔴 El sitio publicado habla con la Supabase de desarrollo** (§11.6).~~
+    ✅ **Arreglado el 01/10/2026** (§11.7): las cuatro variables cambiadas por
+    ti, publicado `dpl_H1oZ…`, y la ruta de salud dice `hzanffqxlpcorrucanxd`.
+    Nada escrito en desarrollo por producción mientras duró (mapa vacío) y
+    ningún paciente afectado. La clave `anon` y el secreto se comprueban con el
+    punto 2. ✅ Comprobados el 02/10: `al_dia` (§11.9).
+21. **🟡 La escucha en vivo de Vercel pierde líneas** (§11.9). De las dos que
+    escribe la ruta de salud de seguido, llega una, y su `rowId` es la marca de
+    tiempo en milisegundos. Lo más probable es que dos líneas del mismo
+    milisegundo choquen. Para el punto 3: una línea que no aparece no demuestra
+    nada. Arreglo posible, sin hacer: que cada ruta escriba su resultado en
+    **una** sola línea. Nuevo en F9. **Y más (§11.10):** del procesamiento del
+    bot, que corre en `after()`, no llegó **ninguna** línea con la escucha viva.
+    Para el bot, lo que manda es la base (`eventos`, `mensajes`).
