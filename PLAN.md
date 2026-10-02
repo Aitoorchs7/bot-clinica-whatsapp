@@ -678,6 +678,12 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    demuestra nada. Arreglo posible, sin hacer: una sola línea por resultado.
    `ESTADO_F9 §11.9`. Y del procesamiento del bot, en `after()`, no llegó
    ninguna con la escucha viva: para el bot manda la base. `ESTADO_F9 §11.10`.
+9. **🟡 El CI no impide dos tiradas a la vez contra desarrollo entre ramas.**
+   `concurrency.group` va por rama; fusionar con el CI del PR en marcha lanza el
+   de `main` encima. Pasó el 02/10 con el PR #3 (tres rojos, ninguno del
+   código; `main`, verde). Arreglo, sin hacer: un grupo común para
+   `auditoria-de-fuga` y `pruebas-vivas`. Hasta entonces, se fusiona solo con
+   el CI del PR terminado. `ESTADO_F9 §11.11`.
 
 ### Infraestructura
 
