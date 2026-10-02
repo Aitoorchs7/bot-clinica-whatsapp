@@ -1593,6 +1593,18 @@ CI depende de que nadie fusione con el CI del PR sin terminar (pendiente 22).
 > Lo más probable es que el cambio se hiciera en el proyecto de desarrollo o
 > que no se guardara. Hay que repetirlo en `hzanffqxlpcorrucanxd` y volver a
 > leerlo. La clave `anon` se queda en el equipo hasta esa segunda lectura.
+>
+> ✅ **Repetido por ti, y leído otra vez a las 18:01 UTC:**
+>
+> ```
+> GET /auth/v1/settings · HTTP 200
+>   disable_signup: true
+>   external.email (entrar con correo y contrasena): true
+> CONTROL clave falsa · HTTP 401 · "Invalid API key"
+> ```
+>
+> La misma lectura dio `false` antes y `true` después. **Paso 2 cerrado**, y
+> con él la decisión e. Se sigue entrando con correo y contraseña.
 
 Solo lo que no puede hacer un agente: decisiones, cuentas, pagos, identidad y
 claves que no deben pasar por el chat. Donde hay una parte técnica que puedo
@@ -1706,13 +1718,14 @@ prueba llega al webhook.
 
 **A · Sin clínica y sin coste**
 
-1. Comprobar que el registro de Auth está apagado. 🔴 Leído el 02/10: **sigue
-   abierto** (`disable_signup: false`, §12). Hay que repetirlo en el proyecto
-   de producción y volver a leerlo.
+1. ~~Comprobar que el registro de Auth está apagado.~~ ✅ **Cerrado el 02/10:**
+   la primera lectura dio `disable_signup: false`; repetido por ti, la segunda
+   da `true` (§12).
 2. Pendiente 22: un grupo de concurrencia común en `ci.yml` para las dos
    tiradas que tocan desarrollo (`auditoria-de-fuga` y `pruebas-vivas`), para
    que se esperen entre ramas. 🟡 **Hecho con tu visto bueno (02/10)** en la
-   rama `f9-fin`. Falta ver que GitHub lo acepta y que dos tiradas se esperan.
+   rama `f9-fin`. GitHub lo acepta (el CI del PR #4 arrancó con él y corrió
+   sus trabajos). Falta ver que dos tiradas se esperan.
 3. Dejar este documento cerrado y su copia de pendientes en `PLAN.md`, en un PR.
 
 Opcionales, también sin coste, pero **fuera del alcance de F9** (§1, LÍMITES):
@@ -1775,9 +1788,8 @@ número, sus plantillas, su alta y la limpieza del modo de prueba (§12, pasos
     01/10 a las 18:38 UTC: ya no depende solo de `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
     28/09). Nuevo en F9. Punto 5. 🟡 **Decidido el 02/10: apagarlo.** Lo hace
-    una persona en el panel (§12, paso 2). Se cierra cuando lo hagas. 🔴
-    Leído el 02/10 después de hacerlo: **sigue abierto** (`disable_signup:
-    false`, §12). Se cierra cuando una segunda lectura diga `true`.
+    una persona en el panel (§12, paso 2). ✅ **Cerrado el 02/10:** la primera
+    lectura dio `disable_signup: false`; repetido, la segunda dio `true` (§12).
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
     el 28/09 (§7.2).
 17. **🔴 La app de Meta no está publicada**: hasta que lo esté, Meta no entrega
@@ -1816,7 +1828,7 @@ número, sus plantillas, su alta y la limpieza del modo de prueba (§12, pasos
     Nuevo en F9. 🟡 **Hecho el 02/10 en `f9-fin`:** los dos trabajos, en el
     grupo `base-de-desarrollo` con `queue: max` (comprobado en la documentación
     de GitHub: el grupo es común al repositorio; con el valor por defecto,
-    `single`, un trabajo en espera se cancela si llega otro). **Sin comprobar**
-    que GitHub acepte `queue` a nivel de trabajo, porque la documentación solo
-    lo enseña a nivel de workflow; el CI del PR lo dirá. Tampoco está visto que
+    `single`, un trabajo en espera se cancela si llega otro). ✅ GitHub acepta
+    `queue` a nivel de trabajo: el CI del PR #4 (run 37043977737) arrancó con
+    él sin error de validación y corrió sus trabajos. **Sin ver todavía** que
     dos tiradas se esperen; se verá la primera vez que coincidan.
