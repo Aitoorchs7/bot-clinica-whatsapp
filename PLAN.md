@@ -649,7 +649,8 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    proyecto, también en `fra1` desde el 01/10 (antes decía `iad1`): ya no
    depende solo de `vercel.json`. `ESTADO_F9 §11`.
 4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
-   28/09). Decisión del punto 5 de F9.
+   28/09). Decisión del punto 5 de F9. 🟡 **Decidido el 02/10: apagarlo.** Lo
+   hace una persona en el panel de Supabase. `ESTADO_F9 §12`.
 5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y
    verificado el 28/09. Pero **la app de Meta no está publicada**, y hasta que
    lo esté Meta no entrega ningún mensaje real, ni de sus administradores.

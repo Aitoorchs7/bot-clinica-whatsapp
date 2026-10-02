@@ -253,7 +253,7 @@ aparezca no demuestra que no pasara.
 | 2 | El secreto JWT | ✅ **Cerrado el 02/10.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado (§11.7). Con la clínica de prueba en la base y en el mapa, la ruta de salud dice **`al_dia`** en producción: Supabase acepta el token del bot y el bot ve su fila (§11.9) |
 | 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción y en el mapa, `al_dia`** (§11.8–11.9). **El bot contesta en producción** a un «Hola» firmado: se identifica como asistente virtual y Meta acepta el envío (§11.10). Falta solo que Meta entregue un mensaje real, y eso exige **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
-| 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
+| 5 | Tus decisiones | ✅ **Todas contestadas.** a y d, cerradas y vistas en producción (§11). b, antes del primer paciente. e, apagar (lo haces tú, §12). c, dicha por ti y sin verificar (§12) |
 | 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7). Con la clínica de prueba: `al_dia` (§11.9) |
 
 ---
@@ -432,6 +432,13 @@ cada una espera tu respuesta.
 > **Después de la fusión (01/10):** a y d, vistas en el despliegue que sirve
 > (§11): `fra1` en la cabecera de dos rutas de función, y un despliegue
 > posterior al borrado de `SUPABASE_SERVICE_ROLE_KEY`.
+>
+> **b y e, contestadas por ti el 02/10:** b · el correo de los escalados,
+> **antes del primer paciente de verdad**, no ahora: necesita un dominio propio
+> y el acuerdo de tratamiento de Resend, y eso va con tener empresa. Hasta
+> entonces, el aviso al equipo depende solo de la plantilla `aviso_escalado`.
+> e · **apagar** el registro abierto de Auth en producción. Lo haces tú en el
+> panel de Supabase (§12, paso 2).
 
 ### a · `SUPABASE_SERVICE_ROLE_KEY` en las variables de producción → **quitarla**
 
@@ -1535,6 +1542,110 @@ se pide.
 
 ---
 
+## 12 · Lo que tienes que hacer tú, sí o sí (02/10/2026)
+
+Solo lo que no puede hacer un agente: decisiones, cuentas, pagos, identidad y
+claves que no deben pasar por el chat. Donde hay una parte técnica que puedo
+hacer yo después, va marcado **→ luego, conmigo**. Por orden de urgencia.
+
+### A · Ya (unos minutos cada uno)
+
+1. **GitHub · fusionar el PR #3** cuando su CI salga verde.
+   https://github.com/Aitoorchs7/bot-clinica-whatsapp/pull/3 → «Merge pull
+   request» → «Confirm merge». Solo lleva documentación; publica lo mismo que
+   ya sirve.
+2. **Supabase · apagar el registro abierto** (decisión e). Proyecto de
+   **producción** (`hzanffqxlpcorrucanxd`) → Authentication → Sign In /
+   Providers → desactivar «Allow new users to sign up» → Save. No afecta a
+   entrar con contraseña ni al alta. **→ luego, conmigo:** compruebo que un
+   registro con la clave anon da error.
+3. **Google · confirmar la facturación de Gemini** (decisión c, hoy solo dicha
+   por ti). En AI Studio, la clave del bot tiene que estar en un proyecto con
+   facturación (nivel de pago). En la consola de Google Cloud → Facturación →
+   **Presupuestos y alertas**, pon un presupuesto mensual con aviso por correo.
+   El precio de `gemini-3.6-flash` **se duplica el 1/1/2027** (§5c).
+4. **Meta · comprobar que el `WHATSAPP_TOKEN` no caduca.** Ha durado más de
+   cinco días, así que no es el temporal de 24 h, pero puede ser uno de 60
+   días. Lo que tiene que ser: un token de un **usuario del sistema**
+   (Configuración del negocio → Usuarios del sistema) con caducidad «Nunca» y
+   los permisos `whatsapp_business_messaging` y
+   `whatsapp_business_management`. Si no lo es, generas uno así y lo pegas tú
+   en Vercel. **→ luego, conmigo:** vuelvo a publicar.
+
+### B · Antes del primer paciente de verdad
+
+5. **Lo legal: quién es el responsable.** Empresa o autónomo, y con eso:
+   - la política de privacidad;
+   - el contrato de encargado del tratamiento con cada clínica (la clínica es
+     la responsable y tú, su encargado);
+   - los acuerdos de tratamiento de datos (DPA) con los proveedores: Supabase,
+     Vercel, Google (Gemini), Meta, Deepgram y Resend;
+   - el registro de actividades de tratamiento.
+
+   Esto conviene revisarlo con un asesor de protección de datos: no es algo que
+   deba decidir un agente. **→ luego, conmigo:** la página `/privacidad` con tu
+   texto.
+6. **Meta · publicar la app.**
+   - La URL de la política de privacidad (paso 5).
+   - El caso de uso «Conecta con los clientes a través de WhatsApp».
+   - La **verificación del negocio** en el administrador comercial.
+   - Hasta que esté publicada, Meta no entrega ningún mensaje real. Es lo único
+     que falta del punto 3 (§11.10).
+7. **Meta · el número de verdad de la clínica.**
+   - Darlo de alta en la WABA, con su nombre visible aprobado y su PIN de
+     verificación en dos pasos.
+   - Un **método de pago** en la cuenta de WhatsApp Business.
+   - **→ luego, conmigo:** su `phone_number_id` en la ficha y en
+     `WHATSAPP_CLINICAS`.
+8. **Meta · crear y aprobar las tres plantillas**, con el cuerpo exacto de
+   `entregas/plantillas-meta.md`: `recordatorio_cita`, `confirmacion_cita` y
+   `aviso_escalado`. Sin la última, hoy el equipo no se entera de un escalado.
+   **→ luego, conmigo, si tú lo decides:** `pnpm alta:comprobar <slug>
+   --plantilla <movil>`, que manda un centinela de verdad. Son pruebas contra
+   producción, así que va con tu «sí» expreso.
+9. **Resend · el correo de los escalados** (decisión b).
+   - Una cuenta y un dominio tuyo verificado con sus registros DNS.
+   - Su DPA.
+   - Pegar tú `RESEND_API_KEY` y `EMAIL_REMITENTE` en Vercel.
+   - **→ luego, conmigo:** volver a publicar y probarlo.
+10. **Supabase · el plan de producción.** Comprobar que el proyecto no está en
+    un plan que se pause por inactividad y que tiene copias de seguridad. Es
+    una base con datos de pacientes.
+11. **La clínica de verdad: la entrevista y sus datos.** Lo que contesta la
+    clínica, y qué es público y qué confidencial. **→ luego, conmigo:** la
+    ficha (`/alta-clinica`) y `pnpm alta` contra producción. Exige volver a
+    poner la `service_role` como variable de Windows un rato, como el 02/10.
+12. **Decidir qué se hace con la clínica de prueba** (`prueba-f9`, el usuario
+    `cobaltiautomations@gmail.com` y tus dos mensajes). Se puede quedar como
+    canario con el número de prueba, o borrarla antes de la primera clínica
+    real. **→ luego, conmigo:** el borrado, que es un solo `DELETE` en cascada,
+    con tu «sí».
+
+### C · Antes de que acabe 2026
+
+13. **Supabase retira las claves heredadas** (`anon`, `service_role`; fecha
+    anunciada «finales de 2026», sin confirmar; pendiente 13). Tú generas las
+    claves nuevas en el panel y las pegas en Vercel. **→ luego, conmigo:** el
+    cambio de `bot.ts`, que no se toca sin tu confirmación, y las pruebas. La
+    ruta de salud lo cantaría el día que pase, pero mejor no esperar a eso.
+
+### D · Higiene de cuentas y del equipo, al cerrar F9
+
+14. **Vercel · el `VERCEL_TOKEN` de esta máquina.** Cuando acabe la fase,
+    revócalo o ponle caducidad (Vercel → Account Settings → Tokens), y bórralo
+    de las variables de Windows.
+15. **`SUPABASE_DB_URL_PROD` en Windows.** Decide si se queda (sirve para
+    inventarios de solo lectura y para un `db push` con tu «sí») o se va. Si se
+    va, cambia también la contraseña de la base en Supabase.
+16. **GitHub · el merge no está bloqueado** (pendiente 2). Con un repositorio
+    privado en el plan gratuito no se pueden exigir los checks antes de
+    fusionar. O se pasa a un plan que lo permita, o se acepta y se fusiona solo
+    con el CI en verde, como hasta ahora.
+17. **Vercel · opcionales.** Borrar `WHATSAPP_PHONE_NUMBER_ID`, que no lee
+    nadie (§11.8), y poner un límite de gasto en el plan Pro.
+
+---
+
 ## 8 · Pendientes vivos
 
 > Esta lista tiene su copia en `PLAN.md` §11. **Si se toca una, se toca la
@@ -1574,7 +1685,8 @@ se pide.
     despliegue `aaefe04` (§11.2). Y el proyecto, también en `fra1` desde el
     01/10 a las 18:38 UTC: ya no depende solo de `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
-    28/09). Nuevo en F9. Punto 5.
+    28/09). Nuevo en F9. Punto 5. 🟡 **Decidido el 02/10: apagarlo.** Lo hace
+    una persona en el panel (§12, paso 2). Se cierra cuando lo hagas.
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
     el 28/09 (§7.2).
 17. **🔴 La app de Meta no está publicada**: hasta que lo esté, Meta no entrega
