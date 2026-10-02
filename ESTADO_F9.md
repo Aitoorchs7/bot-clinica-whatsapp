@@ -251,7 +251,7 @@ aparezca no demuestra que no pasara.
 |---|---|---|
 | 1 | El esquema de producción | ✅ **Cerrado el 28/09: ya estaba entero.** Diez de diez en el historial y en los objetos; nada que aplicar (§6) |
 | 2 | El secreto JWT | ✅ **Cerrado el 02/10.** El sitio apuntaba a la Supabase de desarrollo (§11.6); arreglado (§11.7). Con la clínica de prueba en la base y en el mapa, la ruta de salud dice **`al_dia`** en producción: Supabase acepta el token del bot y el bot ve su fila (§11.9) |
-| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción y en el mapa, `al_dia`** (§11.8–11.9). Faltan: la prueba firmada de §7.5 (pasos 3 y 4) y **publicar la app de Meta** (§7.2) |
+| 3 | El canal de punta a punta | 🟡 **Webhook configurado y verificado, `messages` suscrito, y la firma arreglada** (`META_APP_SECRET` estaba mal, §7.3–7.4). **Clínica de prueba en la base de producción y en el mapa, `al_dia`** (§11.8–11.9). **El bot contesta en producción** a un «Hola» firmado: se identifica como asistente virtual y Meta acepta el envío (§11.10). Falta solo que Meta entregue un mensaje real, y eso exige **publicar la app de Meta** (§7.2) |
 | 4 | El hueco del CI | ✅ **Cerrado el 28/09.** `pruebas-vivas` verde por primera vez: `1074 passed`, el mismo número que en local (§9.8) |
 | 5 | Tus decisiones | 🟡 **a y d, cerradas y vistas en producción** (§11). c, dicha por ti y sin verificar. b y e, pendientes |
 | 6 | La ruta de salud | ✅ **Publicada y lanzada en producción** (01/10): rojo, `ninguna_clinica`, y ha destapado que el sitio hablaba con la base de desarrollo (§11.6). Relanzada tras el arreglo: `hzanffqxlpcorrucanxd` (§11.7). Con la clínica de prueba: `al_dia` (§11.9) |
@@ -1465,6 +1465,69 @@ está demostrado. **Consecuencia para el punto 3:** la escucha en vivo puede
 perder líneas cuando una ruta escribe varias de golpe. Que una línea no
 aparezca no quiere decir que no se escribiera (pendiente 21).
 
+### 11.10 · 🟡 El bot contesta en producción: todo menos la entrega de Meta (02/10/2026)
+
+Pasos 3 y 4 de §7.5. Tú escribiste «Hola» desde tu móvil (+34 685 22 74 13)
+al número de prueba, lo que abre la ventana de 24 h; ese mensaje no llega al
+bot porque la app no está publicada. Pusiste la clave secreta de la app como
+variable de usuario (`META_APP_SECRET_PROD`), y con eso firmé un aviso
+idéntico al de Meta.
+
+```
+despliegue que sirve: dpl_C74em35HeqjCnT1YdLmCE1B2RFM5 · ahora 14:13:40Z
+-- sonda previa VISTA en la escucha 14:13:57
+-- aviso VACIO con la firma buena 14:13:57 · HTTP 200 · EVENT_RECEIVED
+-- CONTROL aviso VACIO con firma falsa 14:13:58 · HTTP 401 · unauthorized
+-- el «Hola» simulado: de +34685227413 a 1143963372124362 · id wamid.PRUEBAF9.1790950438.9cdf6fb4
+-- POST del «Hola» firmado 14:13:58 · HTTP 200 · EVENT_RECEIVED
+   14:13:59 error POST /api/whatsapp/webhook -1 ⚠ Webhook con firma que no cuadra: 401.   <- el CONTROL
+-- sonda final VISTA en la escucha 14:15:20
+   escucha viva antes: si · despues: si · lineas recibidas: 3
+```
+
+**La escucha no recogió ni una línea del procesamiento.** El bot sí escribió
+(el contador escribe en el registro en cada prompt montado), y la escucha
+estaba viva antes y después. Todo lo que pasa dentro de `after()`, es decir
+después de contestar el 200, no ha llegado a la API de registros en vivo.
+Amplía el pendiente 21: **para el bot, lo que manda es la base, no la
+escucha.**
+
+**La base de producción** (solo lectura, por `SUPABASE_DB_URL_PROD`, 14:15:52):
+
+```
+eventos_webhook  msg:wamid.PRUEBAF9.1790950438.9cdf6fb4 · recibido 14:14:00.17 · procesado 14:14:12.23
+conversaciones   +34685227413 · abierta · requiere_humano false · iniciada 14:14:00.42
+mensajes  1 · paciente · entregado · «Hola»                                       · 14:14:00.73
+          2 · bot      · enviado   · tokens 4698 / 86 · wamid.HBgLMzQ2ODUyMjc0MTMVAgARGBJENTFCRTc3NEFENzQ1RDgzOEIA · 14:14:10.90
+              «Hola, soy Asistente, el asistente virtual de Clínica de prueba F9. Quien contesta es un
+               sistema automático, no una persona del equipo. Aquí está cómo tratamos los datos:
+               https://ejemplo.test/privacidad. ¿En qué puedo ayudar?»
+eventos   contador_prompt · 14:14:09.13 · alarma false
+          faq 3 de 3 (0 retenidas) · config 3 de 3 · bloques 9 de 9 · horarios 5 de 5 · tratamientos 2 de 2
+```
+
+Lo que demuestra:
+
+- ✅ **El camino entero del bot, en producción:** firma, anotación única del
+  evento, conversación, los 8 s que agrupan mensajes, clasificador y cerebro
+  en Gemini, respuesta guardada y enviada. Unos 12 s de punta a punta.
+- ✅ **Se identifica como asistente virtual en el primer mensaje** (art. 50 del
+  Reglamento de IA) y enlaza la política de privacidad de la clínica.
+- ✅ **Meta aceptó el envío:** el `wa_message_id` de la respuesta es uno de
+  verdad (`wamid.HBgL…`), devuelto por la API de WhatsApp. Se queda en
+  «enviado» porque los avisos de estado (entregado, leído) son webhooks, y con
+  la app sin publicar no llegan.
+- ✅ **Barandilla 2, en producción:** el bot vio 3 de las 4 preguntas
+  frecuentes y 3 de las 4 filas de `config` (el total real se contó con
+  `postgres` en §11.8). En las dos tablas, la que falta es la confidencial. El
+  contador dice «3 de 3» porque su segundo número es lo que le devolvió la
+  consulta al bot, no el total de la tabla (`contador.ts:13-28`). La respuesta
+  no lleva el marcador `F9-CONFIDENCIAL-7Q2X`.
+- ⚪ **Que la respuesta llegara a tu móvil:** lo dices tú (pendiente de tu
+  confirmación).
+- ⚪ **Que Meta entregue un mensaje real al webhook:** no se puede probar hasta
+  publicar la app (§7.2). Es lo único del punto 3 que falta.
+
 ---
 
 ## 8 · Pendientes vivos
@@ -1533,4 +1596,6 @@ aparezca no quiere decir que no se escribiera (pendiente 21).
     tiempo en milisegundos. Lo más probable es que dos líneas del mismo
     milisegundo choquen. Para el punto 3: una línea que no aparece no demuestra
     nada. Arreglo posible, sin hacer: que cada ruta escriba su resultado en
-    **una** sola línea. Nuevo en F9.
+    **una** sola línea. Nuevo en F9. **Y más (§11.10):** del procesamiento del
+    bot, que corre en `after()`, no llegó **ninguna** línea con la escucha viva.
+    Para el bot, lo que manda es la base (`eventos`, `mensajes`).

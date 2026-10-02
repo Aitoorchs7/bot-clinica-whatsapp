@@ -675,7 +675,8 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    ruta de salud de seguido llega una, y su `rowId` es la marca de tiempo en
    milisegundos. Lo más probable es que choquen. Una línea que no aparece no
    demuestra nada. Arreglo posible, sin hacer: una sola línea por resultado.
-   `ESTADO_F9 §11.9`.
+   `ESTADO_F9 §11.9`. Y del procesamiento del bot, en `after()`, no llegó
+   ninguna con la escucha viva: para el bot manda la base. `ESTADO_F9 §11.10`.
 
 ### Infraestructura
 
