@@ -1523,10 +1523,15 @@ Lo que demuestra:
   contador dice «3 de 3» porque su segundo número es lo que le devolvió la
   consulta al bot, no el total de la tabla (`contador.ts:13-28`). La respuesta
   no lleva el marcador `F9-CONFIDENCIAL-7Q2X`.
-- ⚪ **Que la respuesta llegara a tu móvil:** lo dices tú (pendiente de tu
-  confirmación).
+- ✅ **La respuesta llegó a tu móvil** (lo confirmaste tú el 02/10). Es la
+  única prueba de entrega que hay mientras la app no esté publicada.
 - ⚪ **Que Meta entregue un mensaje real al webhook:** no se puede probar hasta
   publicar la app (§7.2). Es lo único del punto 3 que falta.
+
+Después borraste `META_APP_SECRET_PROD` de Windows. Comprobado: «NO ESTA»; el
+control (`SUPABASE_DB_URL_PROD`, `VERCEL_TOKEN`) sale «esta». Tu número y los
+dos mensajes siguen en producción; los borra la purga a los 90 días, o antes si
+se pide.
 
 ---
 
