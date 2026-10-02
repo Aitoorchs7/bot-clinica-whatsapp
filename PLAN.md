@@ -683,7 +683,8 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    de `main` encima. Pasó el 02/10 con el PR #3 (tres rojos, ninguno del
    código; `main`, verde). Arreglo, sin hacer: un grupo común para
    `auditoria-de-fuga` y `pruebas-vivas`. Hasta entonces, se fusiona solo con
-   el CI del PR terminado. `ESTADO_F9 §11.11`.
+   el CI del PR terminado. `ESTADO_F9 §11.11`. 🟡 Hecho el 02/10 (grupo
+   `base-de-desarrollo`, `queue: max`), pendiente de verlo en el CI.
 
 ### Infraestructura
 
