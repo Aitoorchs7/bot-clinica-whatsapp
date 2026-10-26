@@ -237,7 +237,8 @@ solo a todo archivo que use el cliente del bot.
 | **F6** | Trabajos programados: recordatorios, purga, provisionales caducadas | ✅ Cerrada |
 | **F7** | La suite de conjunto: barandilla 4, quince guiones y CI | ✅ Cerrada |
 | **F8** | `alta-clinica` y la entrega al cliente | ✅ Cerrada |
-| **F9** | Publicación: esquema, secreto y canal en producción, y el CI entero | 🔄 En curso |
+| **F9** | Publicación: esquema, secreto y canal en producción, y el CI entero | 🔄 En curso. Se cierra dentro de F10, paso 3.4 (publicar la app de Meta) |
+| **F10** | La primera clínica de pago: cuentas, lo legal, Meta, el alta, el modo de prueba y los costes | 📝 Plan (`ESTADO_F10.md`), sin ejecutar |
 
 ### F1 · Base de datos y RLS
 
@@ -483,7 +484,7 @@ lo pide **dos veces**:
 ## 11 · Pendientes vivos
 
 > **Esta lista tiene dos copias: aquí y en el `ESTADO_*.md` de la fase en
-> curso, hoy `ESTADO_F9 §8`.** Es deliberado: con F1 casi se pierde un
+> curso, hoy `ESTADO_F10 §14`** (antes `ESTADO_F9 §8`). Es deliberado: con F1 casi se pierde un
 > pendiente porque vivía solo en su `ESTADO_*.md`, y eso depende de que alguien
 > se acuerde de releerlo. **Si se toca una, se toca la otra.**
 
@@ -687,6 +688,45 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    el CI del PR terminado. `ESTADO_F9 §11.11`. 🟡 Hecho el 02/10 (grupo
    `base-de-desarrollo`, `queue: max`). GitHub lo acepta; falta ver que dos
    tiradas se esperan.
+
+### Nuevo en F10 (plan escrito el 02/10/2026, sin ejecutar)
+
+> Copia de `ESTADO_F10 §14`, que ahora es la viva. **Si se toca una, se toca la
+> otra.** Salen de leer el código para planificar la primera clínica; ninguno
+> está arreglado.
+
+23. **🔴 Si Gemini falla, el paciente no recibe nada.** `responder()` lanza y
+    nadie lo recoge (`procesar.ts:309`). Con prepago, un saldo a 0 calla a
+    todas las clínicas. Las urgencias sí se salvan.
+24. **🟡 La ruta de salud llama «temporal» al 402** de saldo agotado
+    (`salud/route.ts:64-69`).
+25. **🔴 Deepgram conserva por defecto el audio de los pacientes**, y se le
+    llama sin `mip_opt_out` y fuera de la UE (`audio.ts:133`).
+26. **🟡 Un mensaje de un número sin par en `WHATSAPP_CLINICAS` se pierde sin
+    rastro** (`route.ts:131-135`). Un par cruzado deja la carga en
+    `eventos_webhook` de la otra clínica antes de negarse.
+27. **🟡 El acta dice que la purga se lleva sus apuntes de `eventos`, y no lo
+    hace** (`02-acta.comprobacion.ts:21-24`).
+28. **🔴 `coste_eur` es 0 en producción con la facturación activa**: faltan
+    `GEMINI_EUR_POR_MTOKEN_*`, y hay una sola tarifa para dos modelos.
+29. **🟡 El historial del grupo puede repetir mensajes** (`procesar.ts:298`,
+    ids de una identidad global).
+30. **🟡 El permiso de los pacientes no se guarda**: `consentimiento_en` no lo
+    escribe nadie, y nada atiende una baja.
+31. **⚪ Nadie comprueba en producción el token de Meta ni la clave de
+    Deepgram.**
+32. **🔴 Supabase de producción está en el plan Free**: se pausa y no tiene
+    copias.
+33. **🟡 `confirmacion_cita` no la manda ningún código**, y
+    `WHATSAPP_PHONE_NUMBER_ID` sobra en Vercel.
+34. **🔴 No hay página para poner ni cambiar la contraseña.** El alta saca un
+    enlace de recuperación (`alta-clinica.mjs:483-494`) que no atiende nada de
+    `src/`, así que ningún propietario puede entrar en su panel. **Bloquea el
+    alta de cualquier clínica.** Avisado por el asistente de F9 el 05/10 y
+    comprobado en el código. Lo construye ese asistente en una rama propia
+    después del PR #4.
+
+Y el 13 (claves heredadas de Supabase) tiene ahora fecha propia: **01/12/2026**.
 
 ### Infraestructura
 
