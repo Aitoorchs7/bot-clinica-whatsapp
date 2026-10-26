@@ -650,7 +650,8 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    depende solo de `vercel.json`. `ESTADO_F9 §11`.
 4. **⚠️ El registro de usuarios de Auth en producción está abierto** (mirado el
    28/09). Decisión del punto 5 de F9. 🟡 **Decidido el 02/10: apagarlo.** Lo
-   hace una persona en el panel de Supabase. `ESTADO_F9 §12`.
+   hace una persona en el panel de Supabase. `ESTADO_F9 §12`. ✅ **Cerrado el
+   02/10**: leído en producción, `disable_signup: true` (antes, `false`).
 5. ~~**🔴 En Meta no hay ningún webhook configurado**~~ ✅ Configurado y
    verificado el 28/09. Pero **la app de Meta no está publicada**, y hasta que
    lo esté Meta no entrega ningún mensaje real, ni de sus administradores.
@@ -678,6 +679,14 @@ fila contra la ficha**, que es donde consta lo que la clínica dijo.
    demuestra nada. Arreglo posible, sin hacer: una sola línea por resultado.
    `ESTADO_F9 §11.9`. Y del procesamiento del bot, en `after()`, no llegó
    ninguna con la escucha viva: para el bot manda la base. `ESTADO_F9 §11.10`.
+9. **🟡 El CI no impide dos tiradas a la vez contra desarrollo entre ramas.**
+   `concurrency.group` va por rama; fusionar con el CI del PR en marcha lanza el
+   de `main` encima. Pasó el 02/10 con el PR #3 (tres rojos, ninguno del
+   código; `main`, verde). Arreglo, sin hacer: un grupo común para
+   `auditoria-de-fuga` y `pruebas-vivas`. Hasta entonces, se fusiona solo con
+   el CI del PR terminado. `ESTADO_F9 §11.11`. 🟡 Hecho el 02/10 (grupo
+   `base-de-desarrollo`, `queue: max`). GitHub lo acepta; falta ver que dos
+   tiradas se esperan.
 
 ### Infraestructura
 

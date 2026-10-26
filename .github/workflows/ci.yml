@@ -62,6 +62,11 @@ on:
   pull_request:
 
 # Un push nuevo sobre la misma rama cancela la ejecucion anterior.
+#
+# Ojo: este grupo es UNO POR RAMA. No impide que la tirada de un PR y la de
+# `main` corran a la vez, y las dos tocan la misma base de desarrollo. Eso lo
+# impide el grupo `base-de-desarrollo` de `auditoria-de-fuga` y
+# `pruebas-vivas`, mas abajo (ESTADO_F9 §11.11, pendiente 22).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -130,6 +135,24 @@ jobs:
     name: auditoria-de-fuga
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # UNA SOLA TIRADA A LA VEZ CONTRA DESARROLLO, aunque vengan de ramas
+    # distintas. El grupo es comun a todo el repositorio y lo comparte con
+    # `pruebas-vivas`: las dos siembran y limpian el mismo fixture.
+    #
+    # Paso el 02/10/2026: se fusiono el PR #3 con su CI en marcha, la
+    # `auditoria-de-fuga` de `main` se llevo el fixture y tres pruebas de
+    # navegador del PR salieron rojas sin que el codigo tuviera nada
+    # (ESTADO_F9 §11.11).
+    #
+    # `queue: max` y no el valor por defecto: con `single`, un trabajo que ya
+    # esta esperando se CANCELA si llega otro, y una tirada cancelada no ha
+    # comprobado nada. Con `max` esperan en cola (hasta 100). No se puede
+    # combinar con `cancel-in-progress: true`, y aqui tampoco se quiere:
+    # cortar una tirada a medias deja el fixture sin limpiar.
+    concurrency:
+      group: base-de-desarrollo
+      cancel-in-progress: false
+      queue: max
 
     steps:
       - uses: actions/checkout@v4
@@ -178,8 +201,16 @@ jobs:
     # vez se pisan (ESTADO_F3 §5.4, ampliado en F5 a Playwright). Dos trabajos
     # concurrentes contra la misma base reproducen exactamente el falso verde
     # de F6: la limpieza de uno deja al otro sin las filas que dice comprobar.
+    #
+    # El `needs` ordena los dos trabajos DENTRO de una misma ejecucion. Entre
+    # ejecuciones distintas (un PR y `main`) lo ordena el grupo
+    # `base-de-desarrollo`, el mismo de `auditoria-de-fuga` (ver alli).
     needs: auditoria-de-fuga
     if: vars.RLS_VIVA == 'true'
+    concurrency:
+      group: base-de-desarrollo
+      cancel-in-progress: false
+      queue: max
 
     steps:
       - uses: actions/checkout@v4

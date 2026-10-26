@@ -1542,7 +1542,69 @@ se pide.
 
 ---
 
+### 11.11 · Después de fusionar el PR #3 (02/10/2026)
+
+**La publicación de `main`**, leída por la API:
+
+```
+sirviendo: dpl_EMEPtWWj83b4ecUptsXvEFDUWdsp · READY · commit 050f64b · source=git · creado 14:35:30Z · regions fra1
+alias: bot-clinica-whatsapp.vercel.app · crons activas en dpl_EMEP… (4) · proyecto: fra1
+variables: 12 · ultima modificada 14:02:28Z · ¿publicacion posterior? si
+```
+
+**🔴 El último CI del PR #3 salió rojo, y se fusionó así.** No fue el código:
+fueron dos tiradas a la vez contra la base de desarrollo.
+
+```
+PR #3 (735d878)  pruebas-vivas      14:28:38 → 14:37:10  failure
+                   ✘ 02-roles.spec.ts:57      14:36:26  page.waitForURL: Test timeout of 30000ms exceeded.
+                   ✘ 05-escalados.spec.ts:27  14:37:06  No hay ninguna clinica sembrada con el slug rls-prueba-a
+                   ✘ 05-escalados.spec.ts:61  14:37:07  No hay ninguna clinica sembrada con el slug rls-prueba-a
+                   [WebServer] El panel de la clinica b8b83a85-… no ha recibido exactamente su clinica (recibidas 0)
+fusion           14:35:24
+main (050f64b)   auditoria-de-fuga  14:35:31 → 14:37:10  success   <- siembra y limpia el mismo fixture
+                 pruebas-vivas      14:37:14 → 14:47:30  success   Tests 1074 passed · 31 passed (Playwright)
+```
+
+La fusión lanzó el CI de `main` con el del PR todavía en marcha, y
+`auditoria-de-fuga` de `main` se llevó el fixture de debajo de las pruebas de
+navegador del PR. El mismo árbol, corriendo solo en `main`, salió verde entero.
+La causa de fondo está en `ci.yml`: `concurrency.group` es
+`${{ github.workflow }}-${{ github.ref }}`, uno por rama, así que un PR y `main`
+no se esperan. Hoy, la regla «una sola tirada a la vez contra desarrollo» en el
+CI depende de que nadie fusione con el CI del PR sin terminar (pendiente 22).
+
 ## 12 · Lo que tienes que hacer tú, sí o sí (02/10/2026)
+
+> **Hechos por ti el 02/10:** los pasos 1, 2, 3 y 4. El 1 está comprobado
+> (§11.11). El 3 y el 4 los dices tú.
+>
+> 🔴 **El 2, comprobado: el registro SIGUE ABIERTO en producción.** Con la
+> clave `anon` que volviste a poner (`SUPABASE_ANON_KEY_PROD`), solo lectura:
+>
+> ```
+> la variable esta: si · es la anon de hzanffqxlpcorrucanxd: si
+> GET /auth/v1/settings · HTTP 200
+>   disable_signup: false
+>   external.email (entrar con correo y contrasena): true
+> CONTROL clave falsa · HTTP 401 · "Invalid API key"
+> ```
+>
+> Lo más probable es que el cambio se hiciera en el proyecto de desarrollo o
+> que no se guardara. Hay que repetirlo en `hzanffqxlpcorrucanxd` y volver a
+> leerlo. La clave `anon` se queda en el equipo hasta esa segunda lectura.
+>
+> ✅ **Repetido por ti, y leído otra vez a las 18:01 UTC:**
+>
+> ```
+> GET /auth/v1/settings · HTTP 200
+>   disable_signup: true
+>   external.email (entrar con correo y contrasena): true
+> CONTROL clave falsa · HTTP 401 · "Invalid API key"
+> ```
+>
+> La misma lectura dio `false` antes y `true` después. **Paso 2 cerrado**, y
+> con él la decisión e. Se sigue entrando con correo y contraseña.
 
 Solo lo que no puede hacer un agente: decisiones, cuentas, pagos, identidad y
 claves que no deben pasar por el chat. Donde hay una parte técnica que puedo
@@ -1646,6 +1708,46 @@ hacer yo después, va marcado **→ luego, conmigo**. Por orden de urgencia.
 
 ---
 
+## 13 · Lo que falta para cerrar F9 (02/10/2026)
+
+F9 termina cuando **un mensaje de WhatsApp real recibe respuesta del bot en
+producción**. Todo lo que hay por medio está comprobado (§11) menos una cosa:
+que **Meta entregue** el mensaje. Y eso no necesita clínica: con la app
+publicada, un «Hola» desde tu móvil (que está en la lista «Para») al número de
+prueba llega al webhook.
+
+**A · Sin clínica y sin coste**
+
+1. ~~Comprobar que el registro de Auth está apagado.~~ ✅ **Cerrado el 02/10:**
+   la primera lectura dio `disable_signup: false`; repetido por ti, la segunda
+   da `true` (§12).
+2. Pendiente 22: un grupo de concurrencia común en `ci.yml` para las dos
+   tiradas que tocan desarrollo (`auditoria-de-fuga` y `pruebas-vivas`), para
+   que se esperen entre ramas. 🟡 **Hecho con tu visto bueno (02/10)** en la
+   rama `f9-fin`. GitHub lo acepta (el CI del PR #4 arrancó con él y corrió
+   sus trabajos). Falta ver que dos tiradas se esperan.
+3. Dejar este documento cerrado y su copia de pendientes en `PLAN.md`, en un PR.
+
+Opcionales, también sin coste, pero **fuera del alcance de F9** (§1, LÍMITES):
+pendiente 19 (el guardián y el error de `getUser()`), 21 (una línea por
+resultado en el registro), 13 (las claves nuevas de Supabase antes de que acabe
+2026), 4 (`04-interruptor.spec.ts:189`) y 10 (el `README.md`).
+
+**B · Depende de terceros, todavía sin clínica**
+
+4. Quién es el responsable legal, y su política de privacidad (§12, paso 5).
+5. La página `/privacidad` con ese texto: la escribo yo cuando lo haya.
+6. Publicar la app de Meta con esa URL y lo que pida Meta (§12, paso 6).
+7. Un «Hola» de verdad desde tu móvil al número de prueba: respuesta en el
+   móvil y su rastro en la base. Con eso, **F9 cerrada**. Gasta unas pocas
+   llamadas a Gemini, que ya pagas.
+
+**C · Depende de la clínica:** ya es la fase siguiente (la primera clínica): su
+número, sus plantillas, su alta y la limpieza del modo de prueba (§12, pasos
+7–12).
+
+---
+
 ## 8 · Pendientes vivos
 
 > Esta lista tiene su copia en `PLAN.md` §11. **Si se toca una, se toca la
@@ -1686,7 +1788,8 @@ hacer yo después, va marcado **→ luego, conmigo**. Por orden de urgencia.
     01/10 a las 18:38 UTC: ya no depende solo de `vercel.json`.
 15. **⚠️ El registro de Auth en producción está abierto** (§3.8, mirado el
     28/09). Nuevo en F9. Punto 5. 🟡 **Decidido el 02/10: apagarlo.** Lo hace
-    una persona en el panel (§12, paso 2). Se cierra cuando lo hagas.
+    una persona en el panel (§12, paso 2). ✅ **Cerrado el 02/10:** la primera
+    lectura dio `disable_signup: false`; repetido, la segunda dio `true` (§12).
 16. ~~**🔴 En Meta no hay webhook configurado**~~ ✅ Configurado y verificado
     el 28/09 (§7.2).
 17. **🔴 La app de Meta no está publicada**: hasta que lo esté, Meta no entrega
@@ -1716,3 +1819,16 @@ hacer yo después, va marcado **→ luego, conmigo**. Por orden de urgencia.
     **una** sola línea. Nuevo en F9. **Y más (§11.10):** del procesamiento del
     bot, que corre en `after()`, no llegó **ninguna** línea con la escucha viva.
     Para el bot, lo que manda es la base (`eventos`, `mensajes`).
+22. **🟡 El CI no impide dos tiradas a la vez contra desarrollo entre ramas**
+    (§11.11). `concurrency.group` va por rama: fusionar con el CI del PR en
+    marcha lanza el de `main` encima, y `auditoria-de-fuga` de uno se lleva el
+    fixture del otro. Pasó el 02/10 (tres rojos en el PR #3, ninguno del
+    código). Arreglo, sin hacer: un grupo común para los dos trabajos que tocan
+    desarrollo. Hasta entonces, se fusiona solo con el CI del PR terminado.
+    Nuevo en F9. 🟡 **Hecho el 02/10 en `f9-fin`:** los dos trabajos, en el
+    grupo `base-de-desarrollo` con `queue: max` (comprobado en la documentación
+    de GitHub: el grupo es común al repositorio; con el valor por defecto,
+    `single`, un trabajo en espera se cancela si llega otro). ✅ GitHub acepta
+    `queue` a nivel de trabajo: el CI del PR #4 (run 37043977737) arrancó con
+    él sin error de validación y corrió sus trabajos. **Sin ver todavía** que
+    dos tiradas se esperen; se verá la primera vez que coincidan.
